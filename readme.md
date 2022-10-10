@@ -16,12 +16,14 @@ How?
 ---\
 Todos
 
-A. Latex\
-B. Pre-Calculus\
-C. Calculus\
-D. Statistics\
-E. Linear Algebra\
-F. Information Theory
+A. cs prerequisites\
+B. Algebra\
+C. Pre-Calculus\
+D. Calculus\
+E. Statistics\
+F. Linear Algebra\
+G. Information Theory\
+Z. Explore!
 
 
 ---\

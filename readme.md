@@ -13,6 +13,15 @@ How?
 3. implement it on code 
 
 
+---\
+
+A. Latex
+B. Pre-Calculus
+C. Calculus 
+D. Statistics
+E. Linear Algebra
+F. Information Theory
+
 
 ---\
 reference

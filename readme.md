@@ -14,12 +14,13 @@ How?
 
 
 ---\
+Todos
 
-A. Latex
-B. Pre-Calculus
-C. Calculus 
-D. Statistics
-E. Linear Algebra
+A. Latex\
+B. Pre-Calculus\
+C. Calculus\
+D. Statistics\
+E. Linear Algebra\
 F. Information Theory
 
 

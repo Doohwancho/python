@@ -1,0 +1,15 @@
+---
+How to use latex?
+
+
+- write .tex file
+	1. v hello.tex
+	2. write latex syntax
+	3. ctrl + e (to compile)
+	4. open skim to see pdf file
+		1. ctrl + e -> update on skim
+- shortcuts
+	- compile
+		- ctrl + e
+	- save
+		- ctrl + s

@@ -1,11 +1,12 @@
----\
+---
 Objective
 
 
 appreciate beauty of nature by deeper understanding of it through lens of mathematics
 
 
----\
+
+---
 Approach
 
 
@@ -14,17 +15,19 @@ Approach
 3. solve real-life problem with code using modularized concepts.
 
 
----\
+
+
+---
 Todos
 
-A. tools\
+
+A. tools
 B. Explore! (for branching out nodes)
 C. Analysis
 
-x. Algebra\
-x. Pre-Calculus\
-x. Calculus\
-x. Statistics\
-x. Linear Algebra\
+x. Calculus
+x. Linear Algebra
+x. Statistics
+x. Algebra
 x. Information Theory
 

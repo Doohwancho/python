@@ -1,0 +1,10 @@
+---
+Objective
+
+
+Logistic Regression
+
+
+Use logistic regression to classify data (e.g., binary classification: cat vs. dog).
+
+Key concepts: Sigmoid function, binary cross-entropy loss, accuracy metric

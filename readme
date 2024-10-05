@@ -2,32 +2,24 @@
 Objective
 
 
-appreciate beauty of nature by deeper understanding of it through lens of mathematics
-
+implement ml paper
 
 
 ---
 Approach
 
 
-1. train how to write in math, using analysis. (checking error on compiler)
-2. modularize concepts
-3. solve real-life problem with code using modularized concepts.
-
+1. download paper
+2. implement it
+3. keep doing it until you become good at it
 
 
 
 ---
-Todos
+Concepts
 
 
-A. tools
-B. Explore! (for branching out nodes)
-C. Analysis
-
-x. Calculus
-x. Linear Algebra
-x. Statistics
-x. Algebra
-x. Information Theory
-
+A. math
+B. python
+C. pytorch
+D. paper

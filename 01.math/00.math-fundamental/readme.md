@@ -2,9 +2,7 @@
 Goal
 
 
-1. Get Soaked!
-2. draw big picture of math
-
+familiarize with math concepts
 
 
 ---\
@@ -14,8 +12,6 @@ Subjects
 a. Nature of Code\
 b. Coding Math\
 c. 직장인과 문과생을 위한 수학교실
-
-x. proof wiki based on latex
 
 
 

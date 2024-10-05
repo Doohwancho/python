@@ -1,0 +1,9 @@
+---
+Objective
+
+
+Classification with k-Nearest Neighbors (k-NN)
+
+Implement a simple k-NN classifier for small datasets.
+
+Key concepts: Distance metrics, majority vote, classification accuracy

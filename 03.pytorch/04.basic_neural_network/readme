@@ -1,0 +1,7 @@
+---
+Objective
+
+
+Build a simple neural network for MNIST digit classification
+
+Key concepts: Layers, activation functions (ReLU, Softmax), backpropagation

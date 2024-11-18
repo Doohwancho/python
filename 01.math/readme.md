@@ -63,7 +63,7 @@ Methods
 
 
 ---\
-Concepts
+Subjects
 
 
 a. geometry\
@@ -75,5 +75,14 @@ f. statistics\
 g. physics
 
 
+
+
+---\
+Concepts
+
+
+a-1. sin cos tan :white_check_mark:\
+a-2. sin cos tan + sec csc cot :white_check_mark:\
+a-3. sin cos tan + sec csc cot with animation :white_check_mark:
 
 

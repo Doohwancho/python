@@ -85,5 +85,6 @@ b-1. sin cos tan :white_check_mark:\
 b-2. sin cos tan + sec csc cot :white_check_mark:\
 b-3. sin cos tan + sec csc cot with animation :white_check_mark:\
 b-4. perpendicular line to the point on circle :white_check_mark:\
-b-5. fundamental trig model :white_check_mark:
-
+b-5. fundamental trig model :white_check_mark:\
+b-6. wave :white_check_mark:\
+b-7. 푸리에변환 :white_check_mark:

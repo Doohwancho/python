@@ -218,3 +218,65 @@ sin을 pi/90 옮긴게 cos
 
 
 
+# 11. wave
+
+![](images/2024-11-19-19-33-50.png)
+
+wave을 이루는 3가지
+
+1. frequency(주파수)
+	- The number of cycles the sine wave completes in a unit of time or distance.
+	- Controls how "fast" the wave oscillates. A higher frequency means the wave oscillates more quickly
+	- Frequency allows customization of the wave's pattern to simulate phenomena like sound waves, light waves, or periodic signals with different oscillation rates.
+2. amplitude(진폭)
+	- The height of the wave's peaks, controlling how "strong" or "intense" the oscillation is
+	- ex. louder the sound
+3. phase(위상 변이)
+	- The horizontal shift of the wave; it offsets the starting position of the sine wave.
+	- ex. pi / 2 shift
+	- Useful for aligning or offsetting waves, like when combining multiple waves to create interference patterns.
+
+
+```js
+function drawWave(component) {
+	ctx.beginPath();
+	ctx.strokeStyle = component.color;
+	ctx.lineWidth = 2;
+
+	for(let x = 0; x < width; x++) {
+		const t = (x - width/2) * 0.02 + time;
+		const y = Math.sin(t * component.freq + component.phase) * component.amp;
+
+		if(x === 0) {
+			ctx.moveTo(x, centerY + y * scale);
+		} else {
+			ctx.lineTo(x, centerY + y * scale);
+		}
+	}
+	ctx.stroke();
+}
+```
+
+1. t = time variable
+2. sin(time * frequency) = wave's frequency
+3. sin(time * frequency + phase) = 오른쪽으로 옮김
+4. \* amp = 진폭
+
+## a. wave 합치기
+이 wave를 다 더하면,
+
+```js
+// Sum only visible components
+components.forEach(comp => {
+	if(comp.visible) {
+		y += Math.sin(t * comp.freq + comp.phase) * comp.amp;
+	}
+});
+```
+wave가 겹쳐진 패턴, 새 wave가 나옴.
+
+
+
+## b. fourier transformation
+
+이걸 다시 역으로 주파수 별로 감지하는게 fourier transformation

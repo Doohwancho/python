@@ -191,10 +191,17 @@ window.onload = function () {
             context.stroke();
     
             // Draw cos (horizontal line from origin to sin line)
+            // context.strokeStyle = colors.cos;
+            // context.beginPath();
+            // context.moveTo(0, 0);
+            // context.lineTo(x, 0);
+            // context.stroke();
+
+            // Draw cos line (horizontal line from y-axis to point on circle)
             context.strokeStyle = colors.cos;
             context.beginPath();
-            context.moveTo(0, 0);
-            context.lineTo(x, 0);
+            context.moveTo(0, y);    // Start from y-axis at the same height as the point
+            context.lineTo(x, y);    // Draw to the point on circle
             context.stroke();
     
             // Calculate perpendicular line intersections
@@ -268,8 +275,10 @@ window.onload = function () {
             context.fillStyle = colors.sin;
             context.fillText("sin θ", x + 10, -y/2);
             
+            // context.fillStyle = colors.cos;
+            // context.fillText("cos θ", x/2, 20);
             context.fillStyle = colors.cos;
-            context.fillText("cos θ", x/2, 20);
+            context.fillText("cos θ", x/2, -(y - 20));  // Move label above the cos line
     
             context.fillStyle = colors.csc;
             context.fillText("csc θ", -30, -y1/2);

@@ -87,4 +87,6 @@ b-3. sin cos tan + sec csc cot with animation :white_check_mark:\
 b-4. perpendicular line to the point on circle :white_check_mark:\
 b-5. fundamental trig model :white_check_mark:\
 b-6. wave :white_check_mark:\
-b-7. 푸리에변환 :white_check_mark:
+b-7. 푸리에변환 :white_check_mark:\
+b-8. 푸리에변환으로 audio 유효 Hz(주파수) visualize :white_check_mark:\
+b-9. 푸리에변환으로 image compression :white_check_mark:

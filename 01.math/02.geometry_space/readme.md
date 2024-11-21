@@ -227,6 +227,7 @@ wave을 이루는 3가지
 1. frequency(주파수)
 	- The number of cycles the sine wave completes in a unit of time or distance.
 	- Controls how "fast" the wave oscillates. A higher frequency means the wave oscillates more quickly
+	- 단위는 오메가(w) 쓰는데, 오메가 = n개 주기(cycle) / 시간(t) ex. 특정 주기에 3번 요동치면 3/1 = 3w
 	- Frequency allows customization of the wave's pattern to simulate phenomena like sound waves, light waves, or periodic signals with different oscillation rates.
 2. amplitude(진폭)
 	- The height of the wave's peaks, controlling how "strong" or "intense" the oscillation is
@@ -280,3 +281,13 @@ wave가 겹쳐진 패턴, 새 wave가 나옴.
 ## b. fourier transformation
 
 이걸 다시 역으로 주파수 별로 감지하는게 fourier transformation
+
+
+# 12. euler's formation
+
+![](images/2024-11-20-17-35-41.png)
+
+
+![](images/2024-11-19-15-57-35.png)
+
+

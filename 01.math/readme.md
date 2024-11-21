@@ -66,13 +66,13 @@ Methods
 Subjects
 
 
-a. geometry\
+a. number_theory\
 b. trigonometry\
 c. algebra\
-d. calculus\
-e. linear_algebra\
-f. statistics\
-g. physics
+d. linear_algebra\
+e. calculus\
+f. probability\
+g. statistics
 
 
 
@@ -80,6 +80,8 @@ g. physics
 ---\
 Concepts
 
+
+a-1. euler's formula on imaginary number:white_check_mark:
 
 b-1. sin cos tan :white_check_mark:\
 b-2. sin cos tan + sec csc cot :white_check_mark:\

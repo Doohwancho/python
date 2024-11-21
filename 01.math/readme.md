@@ -83,7 +83,8 @@ Concepts
 
 a-1. euler's formula on imaginary number:white_check_mark:\
 a-2. 허수와 euler's formula를 이용한 2차원 벡터, object 회전 :white_check_mark:\
-a-3. log & exponential function are inverse :white_check_mark:
+a-3. log & exponential function are inverse :white_check_mark:\
+a-4. e :white_check_mark:
 
 b-1. sin cos tan :white_check_mark:\
 b-2. sin cos tan + sec csc cot :white_check_mark:\

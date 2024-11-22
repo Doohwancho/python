@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monte Carlo Pi Estimation</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #equations {
+            margin-top: 20px;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+        button {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Monte Carlo Simulation for Estimating π</h1>
+    <canvas id="canvas" width="500" height="500" style="border: 1px solid black;"></canvas>
+    <p id="output">Estimated π: </p>
+    <button id="start">Start Simulation</button>
+
+    <div id="equations">
+        <h2>How It Works</h2>
+        <p>The Monte Carlo method estimates the value of \( \pi \) by randomly generating points in a square of side length \( 2r \), where \( r \) is the radius of the inscribed circle:</p>
+        <p>1. The equation of the circle is:</p>
+        <p>\[
+        x^2 + y^2 \leq r^2
+        \]</p>
+        <p>2. The probability of a point falling inside the circle is proportional to the ratio of their areas:</p>
+        <p>\[
+        \frac{\text{Area of Circle}}{\text{Area of Square}} = \frac{\pi r^2}{(2r)^2} = \frac{\pi}{4}
+        \]</p>
+        <p>3. Therefore, we estimate \( \pi \) as:</p>
+        <p>\[
+        \pi \approx 4 \times \frac{\text{Points in Circle}}{\text{Total Points}}
+        \]</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        const output = document.getElementById("output");
+        const startButton = document.getElementById("start");
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const radius = width / 2;
+
+        let totalPoints = 0;
+        let pointsInCircle = 0;
+
+        function drawSquare() {
+            ctx.strokeStyle = "black";
+            ctx.strokeRect(0, 0, width, height);
+        }
+
+        function drawCircle() {
+            ctx.beginPath();
+            ctx.arc(width / 2, height / 2, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = "blue";
+            ctx.stroke();
+        }
+
+        function generateRandomPoint() {
+            const x = Math.random() * width;
+            const y = Math.random() * height;
+            return { x, y };
+        }
+
+        function isInsideCircle(x, y) {
+            const dx = x - width / 2;
+            const dy = y - height / 2;
+            return dx * dx + dy * dy <= radius * radius;
+        }
+
+        function simulatePoint() {
+            const { x, y } = generateRandomPoint();
+            totalPoints++;
+
+            if (isInsideCircle(x, y)) {
+                pointsInCircle++;
+                ctx.fillStyle = "green"; // Point inside circle
+            } else {
+                ctx.fillStyle = "red"; // Point outside circle
+            }
+
+            ctx.fillRect(x, y, 2, 2);
+
+            const piEstimate = (4 * pointsInCircle) / totalPoints;
+            output.textContent = `Estimated π: ${piEstimate.toFixed(6)} (Points: ${totalPoints})`;
+        }
+
+        function startSimulation() {
+            setInterval(simulatePoint, 10);
+        }
+
+        // Initialize canvas
+        drawSquare();
+        drawCircle();
+
+        // Add event listener
+        startButton.addEventListener("click", startSimulation);
+    </script>
+</body>
+</html>

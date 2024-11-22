@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random Walk Simulation</title>
+    <style>
+        canvas {
+            display: block;
+            margin: 20px auto;
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <h1>Random Walk Simulation</h1>
+    <canvas id="canvas" width="500" height="500"></canvas>
+    <p>Click the canvas to restart the simulation!</p>
+
+    <script>
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        const width = canvas.width;
+        const height = canvas.height;
+
+        let x = width / 2;  // Start in the center
+        let y = height / 2;
+
+        function drawRandomStep() {
+            ctx.fillStyle = "black";
+
+            // Draw the current position
+            ctx.fillRect(x, y, 2, 2);
+
+            // Randomly choose a direction (up, down, left, right)
+            const direction = Math.floor(Math.random() * 4);
+            if (direction === 0) x += 2;  // Move right
+            else if (direction === 1) x -= 2;  // Move left
+            else if (direction === 2) y += 2;  // Move down
+            else if (direction === 3) y -= 2;  // Move up
+
+            // Wrap around the edges
+            if (x < 0) x = width - 1;
+            if (x >= width) x = 0;
+            if (y < 0) y = height - 1;
+            if (y >= height) y = 0;
+        }
+
+        function startRandomWalk() {
+            ctx.clearRect(0, 0, width, height); // Clear the canvas
+            x = width / 2;  // Reset to center
+            y = height / 2;
+            setInterval(drawRandomStep, 50);
+        }
+
+        // Start the random walk
+        startRandomWalk();
+
+        // Restart the simulation on canvas click
+        canvas.addEventListener("click", startRandomWalk);
+    </script>
+</body>
+</html>

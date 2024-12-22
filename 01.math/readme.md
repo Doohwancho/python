@@ -1,6 +1,7 @@
 # A. Meta
 
 ## a. key to effectively learning
+
 ---
 goal
 
@@ -101,25 +102,27 @@ c. calculus\
 d. algebra\
 e. statistics\
 f. physics\
-g. machine_learning\
-	1. sp(supervised_learning)
-		1. reg(regression)
-			1. linear_regression
-			2. overfitting_and_regularization
-			3. gradient_descent
-		2. cls(classification)
-			1. logistic_regression
-			2. SVM
-			3. decision_tree
-			4. KNN
-				1. recommendation_system
-	2. us(unsupservised_learning)
-		1. cl(clustering)
-			1. k_means_clustering
-		2. dr(dimension_reduction)
-			1. PCA
-		3. ad(anomaly_detection)
-	3. rl(reinforcement_learning)
+g. machine_learning
+
+1. sp(supervised_learning)
+	1. reg(regression)
+		1. linear_regression
+		2. overfitting_and_regularization
+		3. gradient_descent
+	2. cls(classification)
+		1. logistic_regression
+		2. SVM
+		3. decision_tree
+		4. KNN
+			1. recommendation_system
+2. us(unsupservised_learning)
+	1. cl(clustering)
+		1. k_means_clustering
+	2. dr(dimension_reduction)
+		1. PCA
+	3. ad(anomaly_detection)
+3. rl(reinforcement_learning)
+
 h. deep_learning\
 i. information_theory\
 j. algorithm
@@ -145,4 +148,5 @@ b-7. 푸리에변환 :white_check_mark:\
 b-8. 푸리에변환으로 audio 유효 Hz(주파수) visualize :white_check_mark:\
 b-9. 푸리에변환으로 image compression :white_check_mark:
 
-g-ml-sp-cls-knn-rec-1.collaborative filtering approach :white_check_mark:
+g-ml-sp-cls-knn-rec-1.collaborative filtering approach :white_check_mark:\
+g-ml-sp-cls-knn-rec-2.content based filtering approach (영화 장르+태그를 TF-IDF로 묶어 벡터화한걸 영화끼리 유사도 비교) :white_check_mark:

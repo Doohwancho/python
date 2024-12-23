@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title></title>
+	<style type="text/css">
+	html, body {
+		margin: 0px;
+	}
+	canvas {
+		display: block;
+	}
+	</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+	<script>
+		window.onload = function() {
+    const canvas = document.getElementById("canvas"),
+        context = canvas.getContext("2d"),
+        width = canvas.width = window.innerWidth,
+        height = canvas.height = window.innerHeight;
+
+    let currentTime = 0;
+    let isAnimating = true;
+    let currentTransform = "translation"; // "translation", "rotation", "scaling", "shearing"
+
+    const colors = {
+        grid: "#333333",
+        axis: "#ffffff",
+        point: "#00ff00",
+        vector: "#ff0000",
+        transform: "#0088ff",
+        text: "#ffffff"
+    };
+
+    function drawGrid() {
+        const gridSize = 50;
+        context.strokeStyle = colors.grid;
+        context.lineWidth = 0.5;
+
+        // Draw grid
+        for(let x = 0; x < width; x += gridSize) {
+            context.beginPath();
+            context.moveTo(x, 0);
+            context.lineTo(x, height);
+            context.stroke();
+        }
+        for(let y = 0; y < height; y += gridSize) {
+            context.beginPath();
+            context.moveTo(0, y);
+            context.lineTo(width, y);
+            context.stroke();
+        }
+
+        // Draw main axes
+        context.strokeStyle = colors.axis;
+        context.lineWidth = 2;
+        
+        // X-axis
+        context.beginPath();
+        context.moveTo(0, height/2);
+        context.lineTo(width, height/2);
+        context.stroke();
+
+        // Y-axis
+        context.beginPath();
+        context.moveTo(width/2, 0);
+        context.lineTo(width/2, height);
+        context.stroke();
+
+        // Add axis labels
+        context.fillStyle = colors.text;
+        context.font = "16px Arial";
+        context.fillText("x", width - 20, height/2 - 10);
+        context.fillText("y", width/2 + 10, 20);
+    }
+
+    function drawPoint(x, y, color = colors.point, label = "") {
+        const screenX = width/2 + x * 50;
+        const screenY = height/2 - y * 50;
+
+        context.beginPath();
+        context.arc(screenX, screenY, 5, 0, Math.PI * 2);
+        context.fillStyle = color;
+        context.fill();
+
+        if(label) {
+            context.fillStyle = colors.text;
+            context.font = "14px Arial";
+            context.fillText(label, screenX + 10, screenY - 10);
+        }
+    }
+
+    function drawVector(startX, startY, endX, endY, color = colors.vector, label = "") {
+        const screenStartX = width/2 + startX * 50;
+        const screenStartY = height/2 - startY * 50;
+        const screenEndX = width/2 + endX * 50;
+        const screenEndY = height/2 - endY * 50;
+
+        // Draw arrow
+        context.beginPath();
+        context.moveTo(screenStartX, screenStartY);
+        context.lineTo(screenEndX, screenEndY);
+        context.strokeStyle = color;
+        context.lineWidth = 2;
+        context.stroke();
+
+        // Draw arrowhead
+        const angle = Math.atan2(screenEndY - screenStartY, screenEndX - screenStartX);
+        const headLen = 10;
+        context.beginPath();
+        context.moveTo(screenEndX, screenEndY);
+        context.lineTo(
+            screenEndX - headLen * Math.cos(angle - Math.PI/6),
+            screenEndY - headLen * Math.sin(angle - Math.PI/6)
+        );
+        context.lineTo(
+            screenEndX - headLen * Math.cos(angle + Math.PI/6),
+            screenEndY - headLen * Math.sin(angle + Math.PI/6)
+        );
+        context.closePath();
+        context.fillStyle = color;
+        context.fill();
+
+        if(label) {
+            context.fillStyle = colors.text;
+            context.font = "14px Arial";
+            context.fillText(label, 
+                (screenStartX + screenEndX)/2 + 10, 
+                (screenStartY + screenEndY)/2 - 10
+            );
+        }
+    }
+
+    function drawShape() {
+        const points = [
+            [-2, -1],
+            [-2, 1],
+            [2, 1],
+            [2, -1]
+        ];
+
+        // Draw original shape
+        context.beginPath();
+        points.forEach((point, i) => {
+            const [x, y] = point;
+            const screenX = width/2 + x * 50;
+            const screenY = height/2 - y * 50;
+            if(i === 0) context.moveTo(screenX, screenY);
+            else context.lineTo(screenX, screenY);
+        });
+        context.closePath();
+        context.strokeStyle = colors.point;
+        context.stroke();
+
+        return points;
+    }
+
+    function applyTransformation(points, time) {
+        let transformedPoints;
+
+        switch(currentTransform) {
+            case "translation":
+                const tx = Math.cos(time) * 2;
+                const ty = Math.sin(time) * 2;
+                transformedPoints = points.map(([x, y]) => [
+                    x + tx,
+                    y + ty
+                ]);
+                break;
+
+            case "rotation":
+                const angle = time;
+                transformedPoints = points.map(([x, y]) => [
+                    x * Math.cos(angle) - y * Math.sin(angle),
+                    x * Math.sin(angle) + y * Math.cos(angle)
+                ]);
+                break;
+
+            case "scaling":
+                const sx = 1 + Math.sin(time) * 0.5;
+                const sy = 1 + Math.cos(time) * 0.5;
+                transformedPoints = points.map(([x, y]) => [
+                    x * sx,
+                    y * sy
+                ]);
+                break;
+
+            case "shearing":
+                const sh = Math.sin(time);
+                transformedPoints = points.map(([x, y]) => [
+                    x + y * sh,
+                    y
+                ]);
+                break;
+        }
+
+        // Draw transformed shape
+        context.beginPath();
+        transformedPoints.forEach((point, i) => {
+            const [x, y] = point;
+            const screenX = width/2 + x * 50;
+            const screenY = height/2 - y * 50;
+            if(i === 0) context.moveTo(screenX, screenY);
+            else context.lineTo(screenX, screenY);
+        });
+        context.closePath();
+        context.strokeStyle = colors.transform;
+        context.stroke();
+
+        return transformedPoints;
+    }
+
+    function drawExplanations() {
+        context.fillStyle = colors.text;
+        context.font = "20px Arial";
+        context.textAlign = "left";
+        
+        let y = 30;
+        context.fillText("Affine Space Transformations", 20, y);
+        
+        y += 30;
+        context.font = "16px Arial";
+        context.fillText("Current Transform: " + currentTransform, 20, y);
+        
+        y += 30;
+        context.fillText("Controls:", 20, y);
+        y += 25;
+        const ctrlKey = navigator.platform.includes('Mac') ? '⌘' : 'Ctrl';
+        context.fillText(`${ctrlKey} + 1: Translation`, 40, y);
+        y += 25;
+        context.fillText(`${ctrlKey} + 2: Rotation`, 40, y);
+        y += 25;
+        context.fillText(`${ctrlKey} + 3: Scaling`, 40, y);
+        y += 25;
+        context.fillText(`${ctrlKey} + 4: Shearing`, 40, y);
+        y += 25;
+        context.fillText("Space: Pause/Resume", 40, y);
+    }
+
+    function draw() {
+        // Clear canvas
+        context.fillStyle = 'black';
+        context.fillRect(0, 0, width, height);
+
+        drawGrid();
+        const originalPoints = drawShape();
+        applyTransformation(originalPoints, currentTime);
+        drawExplanations();
+    }
+
+    function animate() {
+        if (isAnimating) {
+            currentTime += 0.02;
+            draw();
+            requestAnimationFrame(animate);
+        }
+    }
+
+    // Event handlers
+    document.addEventListener('keydown', function(event) {
+        // Check for Ctrl/Command key
+        if (event.ctrlKey || event.metaKey) {  // metaKey is Command in Mac
+            switch(event.key) {
+                case '1':
+                    currentTransform = "translation";
+                    break;
+                case '2':
+                    currentTransform = "rotation";
+                    break;
+                case '3':
+                    currentTransform = "scaling";
+                    break;
+                case '4':
+                    currentTransform = "shearing";
+                    break;
+            }
+            if(!isAnimating) draw();
+        } else if (event.code === 'Space') {
+            isAnimating = !isAnimating;
+            if(isAnimating) animate();
+        }
+    });
+    
+
+    animate();
+};
+	</script>
+</body>
+</html>

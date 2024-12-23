@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+        .container { max-width: 800px; margin: 0 auto; }
+        canvas { border: 1px solid #ccc; }
+        .controls {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        .legend {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        .legend div {
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+        }
+        .color-box {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            display: inline-block;
+        }
+        #coordinates {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="graphCanvas"></canvas>
+        <div class="controls">
+            <label>X value: <span id="xValue">0</span></label>
+            <input type="range" id="xSlider" min="-2" max="2" step="0.1" value="0">
+        </div>
+        <div id="coordinates">Move slider or hover over graph to see values</div>
+        <div class="legend">
+            <div><span class="color-box" style="background: rgba(255,0,0,0.3)"></span>e^x area</div>
+            <div><span class="color-box" style="background: rgba(0,0,255,0.3)"></span>2^x area</div>
+            <div><span class="color-box" style="background: rgba(0,255,0,0.3)"></span>3^x area</div>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('graphCanvas');
+        const ctx = canvas.getContext('2d');
+        const coordsDisplay = document.getElementById('coordinates');
+        const xSlider = document.getElementById('xSlider');
+        const xValueDisplay = document.getElementById('xValue');
+
+        // Set canvas size
+        canvas.width = 800;
+        canvas.height = 600;
+
+        // Graph settings
+        const xMin = -2;
+        const xMax = 2;
+        const yMin = -1;
+        const yMax = 7;
+        const gridSize = 0.5;
+
+        // Transform coordinates
+        function transformX(x) {
+            return (x - xMin) * canvas.width / (xMax - xMin);
+        }
+
+        function transformY(y) {
+            return canvas.height - (y - yMin) * canvas.height / (yMax - yMin);
+        }
+
+        // Inverse transforms
+        function inverseTransformX(px) {
+            return px * (xMax - xMin) / canvas.width + xMin;
+        }
+
+        function inverseTransformY(py) {
+            return (canvas.height - py) * (yMax - yMin) / canvas.height + yMin;
+        }
+
+        // Define functions and their properties
+        const functions = {
+            'e^x': {
+                fn: x => Math.exp(x),
+                derivative: x => Math.exp(x),
+                color: '#FF0000',
+                derivColor: '#FF9999',
+                fillColor: 'rgba(255,0,0,0.1)',
+                label: 'e^x'
+            },
+            '2^x': {
+                fn: x => Math.pow(2, x),
+                derivative: x => Math.pow(2, x) * Math.log(2),
+                color: '#0000FF',
+                derivColor: '#9999FF',
+                fillColor: 'rgba(0,0,255,0.1)',
+                label: '2^x'
+            },
+            '3^x': {
+                fn: x => Math.pow(3, x),
+                derivative: x => Math.pow(3, x) * Math.log(3),
+                color: '#00FF00',
+                derivColor: '#99FF99',
+                fillColor: 'rgba(0,255,0,0.1)',
+                label: '3^x'
+            }
+        };
+
+        // Draw grid and axes
+        function drawGrid() {
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;
+
+            for (let x = Math.ceil(xMin / gridSize) * gridSize; x <= xMax; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(transformX(x), 0);
+                ctx.lineTo(transformX(x), canvas.height);
+                ctx.stroke();
+            }
+
+            for (let y = Math.ceil(yMin / gridSize) * gridSize; y <= yMax; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, transformY(y));
+                ctx.lineTo(canvas.width, transformY(y));
+                ctx.stroke();
+            }
+        }
+
+        function drawAxes() {
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(transformX(xMin), transformY(0));
+            ctx.lineTo(transformX(xMax), transformY(0));
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(transformX(0), transformY(yMin));
+            ctx.lineTo(transformX(0), transformY(yMax));
+            ctx.stroke();
+        }
+
+        // Draw function with fill area between function and derivative
+        function drawFunction(fn, derivative, color, derivColor, fillColor, label) {
+            // Draw fill area
+            ctx.fillStyle = fillColor;
+            ctx.beginPath();
+            for (let px = 0; px <= canvas.width; px++) {
+                const x = inverseTransformX(px);
+                const y1 = fn(x);
+                const y2 = derivative(x);
+                if (px === 0) {
+                    ctx.moveTo(px, transformY(y1));
+                } else {
+                    ctx.lineTo(px, transformY(y1));
+                }
+            }
+            for (let px = canvas.width; px >= 0; px--) {
+                const x = inverseTransformX(px);
+                const y = derivative(x);
+                ctx.lineTo(px, transformY(y));
+            }
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw function
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let px = 0; px <= canvas.width; px++) {
+                const x = inverseTransformX(px);
+                const y = fn(x);
+                if (px === 0) {
+                    ctx.moveTo(px, transformY(y));
+                } else {
+                    ctx.lineTo(px, transformY(y));
+                }
+            }
+            ctx.stroke();
+
+            // Draw derivative
+            ctx.strokeStyle = derivColor;
+            ctx.beginPath();
+            for (let px = 0; px <= canvas.width; px++) {
+                const x = inverseTransformX(px);
+                const y = derivative(x);
+                if (px === 0) {
+                    ctx.moveTo(px, transformY(y));
+                } else {
+                    ctx.lineTo(px, transformY(y));
+                }
+            }
+            ctx.stroke();
+
+            // Add label
+            ctx.font = '16px Arial';
+            ctx.fillStyle = color;
+            const labelX = transformX(1.5);
+            const labelY = transformY(fn(1.5));
+            ctx.fillText(label, labelX, labelY);
+        }
+
+        // Draw points at current x value
+        function drawPoints(x) {
+            for (const [name, func] of Object.entries(functions)) {
+                // Draw point on function
+                const y = func.fn(x);
+                ctx.beginPath();
+                ctx.arc(transformX(x), transformY(y), 5, 0, 2 * Math.PI);
+                ctx.fillStyle = func.color;
+                ctx.fill();
+
+                // Draw point on derivative
+                const dy = func.derivative(x);
+                ctx.beginPath();
+                ctx.arc(transformX(x), transformY(dy), 5, 0, 2 * Math.PI);
+                ctx.fillStyle = func.derivColor;
+                ctx.fill();
+            }
+        }
+
+        // Update display
+        function updateDisplay(x) {
+            let coordText = `x: ${x.toFixed(2)}<br>`;
+            for (const [name, func] of Object.entries(functions)) {
+                const y = func.fn(x);
+                const dy = func.derivative(x);
+                coordText += `${name} = ${y.toFixed(2)}, d/dx = ${dy.toFixed(2)}<br>`;
+            }
+            coordsDisplay.innerHTML = coordText;
+            xValueDisplay.textContent = x.toFixed(2);
+        }
+
+        // Draw everything
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            drawAxes();
+
+            // Draw functions with fill areas
+            for (const [name, func] of Object.entries(functions)) {
+                drawFunction(func.fn, func.derivative, func.color, func.derivColor, func.fillColor, func.label);
+            }
+
+            // Draw points at current x value
+            const x = parseFloat(xSlider.value);
+            drawPoints(x);
+            updateDisplay(x);
+        }
+
+        // Event listeners
+        xSlider.addEventListener('input', () => {
+            draw();
+        });
+
+        canvas.addEventListener('mousemove', (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = inverseTransformX(event.clientX - rect.left);
+            updateDisplay(x);
+        });
+
+        // Initial draw
+        draw();
+    </script>
+</body>
+</html>

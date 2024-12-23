@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { margin: 0; background: black; color: white; font-family: monospace; }
+        canvas { display: block; }
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        #formula {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="info">
+        Press:<br>
+        1: Vector Norm (Length)<br>
+        2: Transpose<br>
+        3: Inner Product (Dot Product)<br>
+        SPACE: Animate
+    </div>
+    <div id="formula"></div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const formula = document.getElementById('formula');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let mode = 1;
+        let isAnimating = true;
+        let time = 0;
+
+        function toScreen(x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 16;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2 - y * scale
+            };
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            
+            for(let i = -10; i <= 10; i++) {
+                const start1 = toScreen(i, -10);
+                const end1 = toScreen(i, 10);
+                const start2 = toScreen(-10, i);
+                const end2 = toScreen(10, i);
+                
+                ctx.beginPath();
+                ctx.moveTo(start1.x, start1.y);
+                ctx.lineTo(end1.x, end1.y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+            }
+        }
+
+        function drawAxes() {
+            const origin = toScreen(0, 0);
+            
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(toScreen(-10, 0).x, origin.y);
+            ctx.lineTo(toScreen(10, 0).x, origin.y);
+            ctx.stroke();
+            
+            ctx.strokeStyle = '#44ff44';
+            ctx.beginPath();
+            ctx.moveTo(origin.x, toScreen(0, -10).y);
+            ctx.lineTo(origin.x, toScreen(0, 10).y);
+            ctx.stroke();
+        }
+
+        function drawVector(x, y, color = '#ffff00', width = 2) {
+            const start = toScreen(0, 0);
+            const end = toScreen(x, y);
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+
+            // Arrow head
+            const angle = Math.atan2(end.y - start.y, end.x - start.x);
+            ctx.beginPath();
+            ctx.moveTo(end.x, end.y);
+            ctx.lineTo(
+                end.x - 15 * Math.cos(angle - Math.PI/6),
+                end.y - 15 * Math.sin(angle - Math.PI/6)
+            );
+            ctx.lineTo(
+                end.x - 15 * Math.cos(angle + Math.PI/6),
+                end.y - 15 * Math.sin(angle + Math.PI/6)
+            );
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+
+        function drawNorm() {
+            const x = 3 * Math.cos(time);
+            const y = 2 * Math.sin(time);
+            const norm = Math.sqrt(x*x + y*y);
+            
+            // Draw vector
+            drawVector(x, y, '#ffff00');
+            
+            // Draw circle representing norm
+            ctx.strokeStyle = '#4488ff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(toScreen(0, 0).x, toScreen(0, 0).y, norm * 50, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Show norm value
+            formula.innerHTML = `
+                Vector: (${x.toFixed(2)}, ${y.toFixed(2)})<br>
+                Norm: ||v|| = √(${x.toFixed(2)}² + ${y.toFixed(2)}²) = ${norm.toFixed(2)}
+            `;
+        }
+
+        function drawTranspose() {
+            const matrix = [
+                [Math.cos(time), Math.sin(time)],
+                [-Math.sin(time), Math.cos(time)]
+            ];
+            
+            // Draw original vectors
+            drawVector(matrix[0][0], matrix[0][1], '#ff8888');
+            drawVector(matrix[1][0], matrix[1][1], '#88ff88');
+            
+            // Draw transposed vectors with dashed lines
+            ctx.setLineDash([5, 5]);
+            drawVector(matrix[0][0], matrix[1][0], '#ff8888');
+            drawVector(matrix[0][1], matrix[1][1], '#88ff88');
+            ctx.setLineDash([]);
+
+            formula.innerHTML = `
+                Original Matrix:<br>
+                [${matrix[0][0].toFixed(2)} ${matrix[0][1].toFixed(2)}]<br>
+                [${matrix[1][0].toFixed(2)} ${matrix[1][1].toFixed(2)}]<br><br>
+                Transposed:<br>
+                [${matrix[0][0].toFixed(2)} ${matrix[1][0].toFixed(2)}]<br>
+                [${matrix[0][1].toFixed(2)} ${matrix[1][1].toFixed(2)}]
+            `;
+        }
+
+        function drawInnerProduct() {
+            const v1 = {
+                x: 2 * Math.cos(time),
+                y: 2 * Math.sin(time)
+            };
+            const v2 = {
+                x: 2,
+                y: 1
+            };
+            
+            // Draw vectors
+            drawVector(v1.x, v1.y, '#ff8888');
+            drawVector(v2.x, v2.y, '#88ff88');
+            
+            // Draw angle between vectors
+            const angle = Math.atan2(v2.y, v2.x) - Math.atan2(v1.y, v1.x);
+            const dot = v1.x * v2.x + v1.y * v2.y;
+            const norm1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+            const norm2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+            
+            // Draw arc showing angle
+            const origin = toScreen(0, 0);
+            ctx.beginPath();
+            ctx.strokeStyle = '#4488ff';
+            ctx.arc(origin.x, origin.y, 30, 
+                Math.atan2(v1.y, v1.x), 
+                Math.atan2(v2.y, v2.x),
+                angle < 0);
+            ctx.stroke();
+
+            formula.innerHTML = `
+                v₁ · v₂ = ${dot.toFixed(2)}<br>
+                ||v₁|| = ${norm1.toFixed(2)}<br>
+                ||v₂|| = ${norm2.toFixed(2)}<br>
+                angle = ${(angle * 180 / Math.PI).toFixed(2)}°
+            `;
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+            drawAxes();
+
+            switch(mode) {
+                case 1:
+                    drawNorm();
+                    break;
+                case 2:
+                    drawTranspose();
+                    break;
+                case 3:
+                    drawInnerProduct();
+                    break;
+            }
+        }
+
+        function animate() {
+            if(isAnimating) {
+                time += 0.02;
+                draw();
+                requestAnimationFrame(animate);
+            }
+        }
+
+        document.addEventListener('keydown', e => {
+            if(e.key >= '1' && e.key <= '3') {
+                mode = parseInt(e.key);
+                draw();
+            } else if(e.key === ' ') {
+                isAnimating = !isAnimating;
+                if(isAnimating) animate();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        });
+
+        animate();
+    </script>
+</body>
+</html>

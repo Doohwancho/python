@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { margin: 0; background: black; color: white; font-family: monospace; }
+        canvas { display: block; }
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="info">
+        Press:<br>
+        1: Vector Definition<br>
+        2: Vector Addition<br>
+        3: Scalar Multiplication<br>
+        SPACE: Animate
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let mode = 1;
+        let isAnimating = true;
+        let time = 0;
+
+        function toScreen(x, y) {
+            return {
+                x: canvas.width/2 + x * 50,
+                y: canvas.height/2 - y * 50
+            };
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            
+            for(let i = -20; i <= 20; i++) {
+                const start1 = toScreen(i, -20);
+                const end1 = toScreen(i, 20);
+                const start2 = toScreen(-20, i);
+                const end2 = toScreen(20, i);
+                
+                ctx.beginPath();
+                ctx.moveTo(start1.x, start1.y);
+                ctx.lineTo(end1.x, end1.y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+            }
+        }
+
+        function drawAxes() {
+            const origin = toScreen(0, 0);
+            
+            // X axis
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(toScreen(-20, 0).x, origin.y);
+            ctx.lineTo(toScreen(20, 0).x, origin.y);
+            ctx.stroke();
+            
+            // Y axis
+            ctx.strokeStyle = '#44ff44';
+            ctx.beginPath();
+            ctx.moveTo(origin.x, toScreen(0, -20).y);
+            ctx.lineTo(origin.x, toScreen(0, 20).y);
+            ctx.stroke();
+        }
+
+        function drawVector(x, y, color = '#ffff00', width = 2) {
+            const start = toScreen(0, 0);
+            const end = toScreen(x, y);
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            
+            // Draw line
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+            
+            // Draw arrow head
+            const angle = Math.atan2(end.y - start.y, end.x - start.x);
+            ctx.beginPath();
+            ctx.moveTo(end.x, end.y);
+            ctx.lineTo(
+                end.x - 15 * Math.cos(angle - Math.PI/6),
+                end.y - 15 * Math.sin(angle - Math.PI/6)
+            );
+            ctx.lineTo(
+                end.x - 15 * Math.cos(angle + Math.PI/6),
+                end.y - 15 * Math.sin(angle + Math.PI/6)
+            );
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            // Draw coordinates
+            ctx.fillStyle = color;
+            ctx.font = '14px monospace';
+            ctx.fillText(`(${x.toFixed(1)}, ${y.toFixed(1)})`, end.x + 10, end.y);
+        }
+
+        function drawVectorDefinition() {
+            const x = 3 * Math.cos(time);
+            const y = 2 * Math.sin(time);
+            drawVector(x, y, '#ffff00');
+        }
+
+        function drawVectorAddition() {
+            const v1 = {
+                x: 2 * Math.cos(time),
+                y: 2 * Math.sin(time)
+            };
+            const v2 = {
+                x: 1,
+                y: 1
+            };
+            const sum = {
+                x: v1.x + v2.x,
+                y: v1.y + v2.y
+            };
+
+            // Draw first vector
+            drawVector(v1.x, v1.y, '#ff8888');
+            
+            // Draw second vector from tip of first
+            const start = toScreen(v1.x, v1.y);
+            const end = toScreen(sum.x, sum.y);
+            ctx.strokeStyle = '#88ff88';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+
+            // Draw resultant vector
+            drawVector(sum.x, sum.y, '#ffff00', 3);
+        }
+
+        function drawScalarMultiplication() {
+            const baseVector = {
+                x: 2,
+                y: 1
+            };
+            const scalar = 1 + Math.sin(time);
+            
+            // Draw base vector
+            drawVector(baseVector.x, baseVector.y, '#ff8888');
+            
+            // Draw scaled vector
+            drawVector(
+                baseVector.x * scalar,
+                baseVector.y * scalar,
+                '#ffff00',
+                3
+            );
+
+            // Show scalar value
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px monospace';
+            ctx.fillText(`Scalar: ${scalar.toFixed(2)}`, 20, canvas.height - 40);
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+            drawAxes();
+
+            switch(mode) {
+                case 1:
+                    drawVectorDefinition();
+                    break;
+                case 2:
+                    drawVectorAddition();
+                    break;
+                case 3:
+                    drawScalarMultiplication();
+                    break;
+            }
+        }
+
+        function animate() {
+            if(isAnimating) {
+                time += 0.02;
+                draw();
+                requestAnimationFrame(animate);
+            }
+        }
+
+        document.addEventListener('keydown', e => {
+            if(e.key >= '1' && e.key <= '3') {
+                mode = parseInt(e.key);
+                draw();
+            } else if(e.key === ' ') {
+                isAnimating = !isAnimating;
+                if(isAnimating) animate();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        });
+
+        animate();
+    </script>
+</body>
+</html>

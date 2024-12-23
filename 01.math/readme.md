@@ -105,10 +105,20 @@ a. number_theory
 		2. fourier_transformation
 	2. real_number
 3. log & exponential
+	1. log
+	2. exponential
 4. e
 5. quaternion
 
-b. geometry\
+b. geometry
+
+1. trigonometry
+	1. fundamental trig functions
+2. interactive_design
+	1. sin cos tan
+	2. node garden
+3. 3d
+
 c. calculus\
 d. algebra\
 e. statistics\

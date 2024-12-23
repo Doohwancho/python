@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { margin: 0; overflow: hidden; background: black; }
+        canvas { display: block; }
+        .controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: monospace;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="controls">
+        Controls:<br>
+        1: dy/dx = y (exponential)<br>
+        2: dy/dx = -y (decay)<br>
+        3: dy/dx = sin(x) (oscillating)<br>
+        Drag to rotate view<br>
+        Space to pause/resume
+    </div>
+    <script>
+window.onload = function() {
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let rotationX = Math.PI/4;
+    let rotationY = -Math.PI/4;
+    let isDragging = false;
+    let lastMouseX, lastMouseY;
+    let currentEquation = "exponential";
+    let isAnimating = true;
+    let currentTime = 0;
+
+    // Colors
+    const colors = {
+        grid: "#333333",
+        axes: "#666666",
+        vector: "#00ff88",
+        solution: "#ff3366",
+        text: "#ffffff"
+    };
+
+    // Project 3D point to 2D
+    function project(x, y, z) {
+        const cos1 = Math.cos(rotationY);
+        const sin1 = Math.sin(rotationY);
+        const cos2 = Math.cos(rotationX);
+        const sin2 = Math.sin(rotationX);
+
+        const x1 = x * cos1 + z * sin1;
+        const y1 = y;
+        const z1 = -x * sin1 + z * cos1;
+
+        const x2 = x1;
+        const y2 = y1 * cos2 - z1 * sin2;
+        const z2 = y1 * sin2 + z1 * cos2;
+
+        const scale = 60;
+        const perspective = 1000;
+        const factor = perspective / (perspective + z2);
+
+        return {
+            x: canvas.width/2 + x2 * scale * factor,
+            y: canvas.height/2 + y2 * scale * factor,
+            z: z2
+        };
+    }
+
+    // Different differential equations
+    const equations = {
+        exponential: {
+            derivative: (x, y) => y,
+            solution: (x, c) => c * Math.exp(x),
+            title: "dy/dx = y (Exponential Growth)"
+        },
+        decay: {
+            derivative: (x, y) => -y,
+            solution: (x, c) => c * Math.exp(-x),
+            title: "dy/dx = -y (Exponential Decay)"
+        },
+        oscillating: {
+            derivative: (x, y) => Math.sin(x),
+            solution: (x, c) => -Math.cos(x) + c,
+            title: "dy/dx = sin(x) (Oscillating)"
+        }
+    };
+
+    function drawAxes() {
+        const size = 10;
+        const origin = project(0, 0, 0);
+        
+        // X-axis
+        ctx.beginPath();
+        ctx.strokeStyle = colors.axes;
+        ctx.lineWidth = 2;
+        const xEnd = project(size, 0, 0);
+        ctx.moveTo(origin.x, origin.y);
+        ctx.lineTo(xEnd.x, xEnd.y);
+        ctx.stroke();
+        ctx.fillStyle = colors.text;
+        ctx.fillText("x", xEnd.x + 10, xEnd.y);
+
+        // Y-axis
+        ctx.beginPath();
+        const yEnd = project(0, size, 0);
+        ctx.moveTo(origin.x, origin.y);
+        ctx.lineTo(yEnd.x, yEnd.y);
+        ctx.stroke();
+        ctx.fillText("y", yEnd.x + 10, yEnd.y);
+
+        // Grid
+        ctx.strokeStyle = colors.grid;
+        ctx.lineWidth = 0.5;
+        for(let i = -size; i <= size; i++) {
+            if(i === 0) continue;
+            // X-grid
+            const gridStart = project(i, -size, 0);
+            const gridEnd = project(i, size, 0);
+            ctx.beginPath();
+            ctx.moveTo(gridStart.x, gridStart.y);
+            ctx.lineTo(gridEnd.x, gridEnd.y);
+            ctx.stroke();
+
+            // Y-grid
+            const gridStart2 = project(-size, i, 0);
+            const gridEnd2 = project(size, i, 0);
+            ctx.beginPath();
+            ctx.moveTo(gridStart2.x, gridStart2.y);
+            ctx.lineTo(gridEnd2.x, gridEnd2.y);
+            ctx.stroke();
+        }
+    }
+
+    function drawVectorField() {
+        const equation = equations[currentEquation];
+        const spacing = 1;
+        const size = 5;
+
+        for(let x = -size; x <= size; x += spacing) {
+            for(let y = -size; y <= size; y += spacing) {
+                const derivative = equation.derivative(x, y);
+                const length = 0.5;
+                const angle = Math.atan2(derivative, 1);
+                
+                const start = project(x, y, 0);
+                const end = project(
+                    x + length * Math.cos(angle),
+                    y + length * Math.sin(angle),
+                    0
+                );
+
+                ctx.beginPath();
+                ctx.strokeStyle = colors.vector;
+                ctx.lineWidth = 1;
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+            }
+        }
+    }
+
+    function drawSolutionCurves() {
+        const equation = equations[currentEquation];
+        const initialConditions = [-2, -1, 0, 1, 2];
+        
+        initialConditions.forEach(c => {
+            ctx.beginPath();
+            ctx.strokeStyle = colors.solution;
+            ctx.lineWidth = 2;
+
+            for(let x = -5; x <= 5; x += 0.1) {
+                const y = equation.solution(x, c);
+                const point = project(x, y, 0);
+                
+                if(x === -5) ctx.moveTo(point.x, point.y);
+                else ctx.lineTo(point.x, point.y);
+            }
+            ctx.stroke();
+        });
+    }
+
+    function draw() {
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        drawAxes();
+        drawVectorField();
+        drawSolutionCurves();
+
+        // Draw equation title
+        ctx.fillStyle = colors.text;
+        ctx.font = "20px monospace";
+        ctx.fillText(equations[currentEquation].title, 20, canvas.height - 30);
+    }
+
+    function animate() {
+        if(isAnimating) {
+            currentTime += 0.02;
+            draw();
+            requestAnimationFrame(animate);
+        }
+    }
+
+    // Event handlers
+    canvas.addEventListener('mousedown', e => {
+        isDragging = true;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+    });
+
+    canvas.addEventListener('mousemove', e => {
+        if(isDragging) {
+            const deltaX = e.clientX - lastMouseX;
+            const deltaY = e.clientY - lastMouseY;
+            rotationY += deltaX * 0.01;
+            rotationX += deltaY * 0.01;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            draw();
+        }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+
+    document.addEventListener('keydown', e => {
+        switch(e.key) {
+            case '1':
+                currentEquation = "exponential";
+                break;
+            case '2':
+                currentEquation = "decay";
+                break;
+            case '3':
+                currentEquation = "oscillating";
+                break;
+            case ' ':
+                isAnimating = !isAnimating;
+                if(isAnimating) animate();
+                break;
+        }
+        draw();
+    });
+
+    animate();
+};
+    </script>
+</body>
+</html>

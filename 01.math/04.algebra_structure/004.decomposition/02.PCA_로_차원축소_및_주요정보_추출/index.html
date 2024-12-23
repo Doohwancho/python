@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PCA Visualization</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: #0a0a0a;
+            color: white;
+        }
+        canvas {
+            display: block;
+        }
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+        }
+        #explanation {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .math {
+            font-family: "Times New Roman", serif;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        button {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="controls">
+        <button id="playPauseBtn">Play/Pause</button>
+        <button id="newDataBtn">New Data</button>
+        <button id="projectionBtn">Toggle Projection</button>
+    </div>
+    <div id="explanation">
+        <h2>Principal Component Analysis</h2>
+        <div>
+            <h3>Steps:</h3>
+            <ol>
+                <li>Center the data (subtract mean)</li>
+                <li>Compute covariance matrix</li>
+                <li>Find eigenvectors & eigenvalues</li>
+                <li>Project data onto principal components</li>
+            </ol>
+        </div>
+        <div class="math">
+            <p>Covariance Matrix:</p>
+            <p>Σ = 1/n ∑(x-μ)(x-μ)ᵀ</p>
+        </div>
+        <div class="math">
+            <p>Eigendecomposition:</p>
+            <p>Σv = λv</p>
+        </div>
+        <div id="stats">
+            <p>Explained Variance:</p>
+            <p id="variance-ratio"></p>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Setup animation and state
+        let data = [];
+        let mean = {x: 0, y: 0};
+        let eigenvectors = [];
+        let eigenvalues = [];
+        let isAnimating = true;
+        let showProjection = true;
+        let currentTime = 0;
+        let animationFrame;
+
+        // Set canvas size
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw(); // Redraw when resizing
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        function generateData(n = 100) {
+            // Generate correlated data
+            const angle = Math.PI / 3;
+            const scale1 = 3;
+            const scale2 = 1;
+            
+            return Array.from({length: n}, () => {
+                const t = Math.random() * 2 - 1;
+                return {
+                    x: Math.cos(angle) * t * scale1 + Math.random() * 0.3,
+                    y: Math.sin(angle) * t * scale1 + Math.random() * 0.3
+                };
+            });
+        }
+
+        function computeMean(points) {
+            const sum = points.reduce((acc, p) => ({
+                x: acc.x + p.x,
+                y: acc.y + p.y
+            }), {x: 0, y: 0});
+            
+            return {
+                x: sum.x / points.length,
+                y: sum.y / points.length
+            };
+        }
+
+        function computeCovarianceMatrix(points, mean) {
+            let cxx = 0, cxy = 0, cyy = 0;
+            
+            points.forEach(p => {
+                const dx = p.x - mean.x;
+                const dy = p.y - mean.y;
+                cxx += dx * dx;
+                cxy += dx * dy;
+                cyy += dy * dy;
+            });
+
+            const n = points.length;
+            return {
+                xx: cxx / n,
+                xy: cxy / n,
+                yy: cyy / n
+            };
+        }
+
+        function computeEigenvectors(cov) {
+            const trace = cov.xx + cov.yy;
+            const det = cov.xx * cov.yy - cov.xy * cov.xy;
+            
+            const lambda1 = (trace + Math.sqrt(trace * trace - 4 * det)) / 2;
+            const lambda2 = (trace - Math.sqrt(trace * trace - 4 * det)) / 2;
+            
+            const v1 = {
+                x: cov.xy,
+                y: lambda1 - cov.xx
+            };
+            const v2 = {
+                x: cov.xy,
+                y: lambda2 - cov.xx
+            };
+
+            const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+            const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+
+            return {
+                vectors: [
+                    {x: v1.x / mag1, y: v1.y / mag1},
+                    {x: v2.x / mag2, y: v2.y / mag2}
+                ],
+                values: [lambda1, lambda2]
+            };
+        }
+
+        function projectPoint(point, vector) {
+            const dot = (point.x * vector.x + point.y * vector.y);
+            return {
+                x: vector.x * dot,
+                y: vector.y * dot
+            };
+        }
+
+        function toScreen(x, y) {
+            const scale = 100;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2 - y * scale
+            };
+        }
+
+        function drawPoint(p, color = 'white', size = 4) {
+            const pos = toScreen(p.x, p.y);
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+
+        function drawVector(v, color = 'white', scale = 2) {
+            const start = toScreen(0, 0);
+            const end = toScreen(v.x * scale, v.y * scale);
+            
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw arrowhead
+            const angle = Math.atan2(end.y - start.y, end.x - start.x);
+            const headLen = 10;
+            ctx.beginPath();
+            ctx.moveTo(end.x, end.y);
+            ctx.lineTo(
+                end.x - headLen * Math.cos(angle - Math.PI/6),
+                end.y - headLen * Math.sin(angle - Math.PI/6)
+            );
+            ctx.lineTo(
+                end.x - headLen * Math.cos(angle + Math.PI/6),
+                end.y - headLen * Math.sin(angle + Math.PI/6)
+            );
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+
+        function drawGrid() {
+            const gridSize = 20;
+            
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            
+            for(let i = -gridSize; i <= gridSize; i++) {
+                const start = toScreen(i, -gridSize);
+                const end = toScreen(i, gridSize);
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+
+                const start2 = toScreen(-gridSize, i);
+                const end2 = toScreen(gridSize, i);
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+            }
+
+            // Draw axes
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 2;
+            const origin = toScreen(0, 0);
+            
+            ctx.beginPath();
+            ctx.moveTo(origin.x, 0);
+            ctx.lineTo(origin.x, canvas.height);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(0, origin.y);
+            ctx.lineTo(canvas.width, origin.y);
+            ctx.stroke();
+        }
+
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid
+            drawGrid();
+
+            // Rotate eigenvectors with time for animation
+            if (isAnimating && eigenvectors.length) {
+                const angle = currentTime * 0.5;
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+                eigenvectors[0] = {
+                    x: cos,
+                    y: sin
+                };
+                eigenvectors[1] = {
+                    x: -sin,
+                    y: cos
+                };
+            }
+
+            // Draw mean point
+            drawPoint(mean, 'yellow', 6);
+
+            // Draw data points
+            data.forEach(p => {
+                drawPoint(p, 'rgba(255, 255, 255, 0.5)');
+            });
+
+            // Draw eigenvectors
+            if(eigenvectors.length) {
+                const totalVar = eigenvalues[0] + eigenvalues[1];
+                const varRatio1 = (eigenvalues[0] / totalVar * 100).toFixed(1);
+                const varRatio2 = (eigenvalues[1] / totalVar * 100).toFixed(1);
+
+                drawVector(eigenvectors[0], '#ff0000', Math.sqrt(eigenvalues[0]));
+                drawVector(eigenvectors[1], '#00ff00', Math.sqrt(eigenvalues[1]));
+
+                document.getElementById('variance-ratio').textContent = 
+                    `PC1: ${varRatio1}% PC2: ${varRatio2}%`;
+
+                // Draw projections if enabled
+                if(showProjection) {
+                    data.forEach(p => {
+                        const proj = projectPoint(p, eigenvectors[0]);
+                        ctx.beginPath();
+                        const start = toScreen(p.x, p.y);
+                        const end = toScreen(proj.x, proj.y);
+                        ctx.moveTo(start.x, start.y);
+                        ctx.lineTo(end.x, end.y);
+                        ctx.strokeStyle = 'rgba(255, 0, 0, 0.2)';
+                        ctx.stroke();
+                        drawPoint(proj, 'rgba(255, 0, 0, 0.5)', 3);
+                    });
+                }
+            }
+        }
+
+        function animate() {
+            if(isAnimating) {
+                currentTime += 0.02;
+                draw();
+                animationFrame = requestAnimationFrame(animate);
+            }
+        }
+
+        function generateNewData() {
+            data = generateData();
+            mean = computeMean(data);
+            const cov = computeCovarianceMatrix(data, mean);
+            const eigen = computeEigenvectors(cov);
+            eigenvectors = eigen.vectors;
+            eigenvalues = eigen.values;
+            draw();
+        }
+
+        // Event Listeners
+        document.getElementById('playPauseBtn').addEventListener('click', () => {
+            isAnimating = !isAnimating;
+            if(isAnimating) {
+                animate();
+            } else {
+                cancelAnimationFrame(animationFrame);
+            }
+        });
+
+        document.getElementById('newDataBtn').addEventListener('click', generateNewData);
+        
+        document.getElementById('projectionBtn').addEventListener('click', () => {
+            showProjection = !showProjection;
+            draw();
+        });
+
+        // Initialize
+        generateNewData();
+        animate();
+    </script>
+</body>
+</html>

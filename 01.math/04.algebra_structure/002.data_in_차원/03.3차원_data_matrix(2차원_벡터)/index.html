@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Matrix Concepts Visualizer</title>
+    <style>
+        body { 
+            margin: 0; 
+            background: black; 
+            color: white; 
+            font-family: monospace;
+            overflow: hidden;
+        }
+        canvas { display: block; }
+        .panel {
+            position: fixed;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        #controls {
+            top: 20px;
+            left: 20px;
+        }
+        #info {
+            top: 20px;
+            right: 20px;
+            width: 300px;
+        }
+        .tab {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 0 5px;
+            cursor: pointer;
+            border: 1px solid #666;
+            border-radius: 4px;
+        }
+        .tab.active {
+            background: #444;
+        }
+        #matrix {
+            bottom: 20px;
+            left: 20px;
+            font-family: monospace;
+            white-space: pre;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="controls" class="panel">
+        <div class="tab-container">
+            <span class="tab active" data-mode="transform">Transformations</span>
+            <span class="tab" data-mode="determinant">Determinant</span>
+            <span class="tab" data-mode="orthogonal">Orthogonal</span>
+        </div><br>
+        SPACE: Toggle Animation<br>
+        DRAG: Transform Matrix
+    </div>
+    <div id="info" class="panel"></div>
+    <div id="matrix" class="panel"></div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const info = document.getElementById('info');
+        const matrixDiv = document.getElementById('matrix');
+        const tabs = document.querySelectorAll('.tab');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let mode = 'transform';
+        let isAnimating = true;
+        let time = 0;
+        let isDragging = false;
+        let lastMouse = { x: 0, y: 0 };
+
+        // Helper functions
+        function toScreen(x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 16;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2 - y * scale
+            };
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            for(let i = -10; i <= 10; i++) {
+                const start1 = toScreen(i, -10);
+                const end1 = toScreen(i, 10);
+                const start2 = toScreen(-10, i);
+                const end2 = toScreen(10, i);
+                
+                ctx.beginPath();
+                ctx.moveTo(start1.x, start1.y);
+                ctx.lineTo(end1.x, end1.y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+            }
+        }
+
+        function multiplyMatrix(a, b) {
+            const result = [];
+            for(let i = 0; i < a.length; i++) {
+                result[i] = [];
+                for(let j = 0; j < b[0].length; j++) {
+                    result[i][j] = 0;
+                    for(let k = 0; k < a[0].length; k++) {
+                        result[i][j] += a[i][k] * b[k][j];
+                    }
+                }
+            }
+            return result;
+        }
+
+        function drawVector(x, y, color = '#ffff00', width = 2, label = '') {
+            const start = toScreen(0, 0);
+            const end = toScreen(x, y);
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+
+            // Arrow head
+            const angle = Math.atan2(end.y - start.y, end.x - start.x);
+            ctx.beginPath();
+            ctx.moveTo(end.x, end.y);
+            ctx.lineTo(
+                end.x - 15 * Math.cos(angle - Math.PI/6),
+                end.y - 15 * Math.sin(angle - Math.PI/6)
+            );
+            ctx.lineTo(
+                end.x - 15 * Math.cos(angle + Math.PI/6),
+                end.y - 15 * Math.sin(angle + Math.PI/6)
+            );
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            if(label) {
+                ctx.fillStyle = color;
+                ctx.font = '16px monospace';
+                ctx.fillText(label, end.x + 10, end.y + 10);
+            }
+        }
+
+        function drawTransformations() {
+            const theta = time;
+            const rotation = [
+                [Math.cos(theta), -Math.sin(theta)],
+                [Math.sin(theta), Math.cos(theta)]
+            ];
+            
+            const scale = 1.5 + Math.sin(time);
+            const scaling = [
+                [scale, 0],
+                [0, scale]
+            ];
+
+            const result = multiplyMatrix(rotation, scaling);
+
+            // Draw original vectors
+            drawVector(1, 0, '#ff8888', 2, 'i');
+            drawVector(0, 1, '#88ff88', 2, 'j');
+
+            // Draw transformed vectors
+            drawVector(result[0][0], result[1][0], '#ff4444', 3, 'Ti');
+            drawVector(result[0][1], result[1][1], '#44ff44', 3, 'Tj');
+
+            info.innerHTML = `
+                Matrix Transformations:<br><br>
+                • Composition of rotations and scaling<br>
+                • Order matters (AB ≠ BA)<br>
+                • Linear transformations preserve grid lines<br>
+                • Watch how vectors transform
+            `;
+
+            matrixDiv.innerHTML = `
+                T = Rotation × Scale =
+                [${result[0][0].toFixed(2)} ${result[0][1].toFixed(2)}]
+                [${result[1][0].toFixed(2)} ${result[1][1].toFixed(2)}]
+            `;
+        }
+
+        function drawDeterminant() {
+            const theta = time;
+            const matrix = [
+                [Math.cos(theta), -Math.sin(theta)],
+                [Math.sin(theta), Math.cos(theta)]
+            ];
+
+            // Draw parallelogram
+            drawVector(matrix[0][0], matrix[1][0], '#ff4444', 3, 'v₁');
+            drawVector(matrix[0][1], matrix[1][1], '#44ff44', 3, 'v₂');
+
+            // Draw area
+            ctx.beginPath();
+            ctx.fillStyle = '#ffff0022';
+            const p1 = toScreen(0, 0);
+            const p2 = toScreen(matrix[0][0], matrix[1][0]);
+            const p3 = toScreen(
+                matrix[0][0] + matrix[0][1],
+                matrix[1][0] + matrix[1][1]
+            );
+            const p4 = toScreen(matrix[0][1], matrix[1][1]);
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.lineTo(p3.x, p3.y);
+            ctx.lineTo(p4.x, p4.y);
+            ctx.closePath();
+            ctx.fill();
+
+            const det = matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
+
+            info.innerHTML = `
+                Determinant Properties:<br><br>
+                • Measures area scaling<br>
+                • Sign indicates orientation<br>
+                • det(AB) = det(A)det(B)<br>
+                • det = 0 means singular matrix
+            `;
+
+            matrixDiv.innerHTML = `
+                Matrix = 
+                [${matrix[0][0].toFixed(2)} ${matrix[0][1].toFixed(2)}]
+                [${matrix[1][0].toFixed(2)} ${matrix[1][1].toFixed(2)}]
+                det = ${det.toFixed(2)}
+            `;
+        }
+
+        function drawOrthogonal() {
+            const theta = time;
+            const matrix = [
+                [Math.cos(theta), -Math.sin(theta)],
+                [Math.sin(theta), Math.cos(theta)]
+            ];
+
+            // Draw basis vectors
+            drawVector(1, 0, '#ff8888', 2, 'i');
+            drawVector(0, 1, '#88ff88', 2, 'j');
+
+            // Draw transformed vectors
+            drawVector(matrix[0][0], matrix[1][0], '#ff4444', 3, 'Qi');
+            drawVector(matrix[0][1], matrix[1][1], '#44ff44', 3, 'Qj');
+
+            // Draw unit circle
+            ctx.strokeStyle = '#4488ff';
+            ctx.beginPath();
+            const center = toScreen(0, 0);
+            ctx.arc(
+                center.x, 
+                center.y,
+                Math.min(canvas.width, canvas.height)/16, 
+                0, 
+                Math.PI * 2
+            );
+            ctx.stroke();
+
+            info.innerHTML = `
+                Orthogonal Matrix:<br><br>
+                • Preserves lengths and angles<br>
+                • Q^T Q = Q Q^T = I<br>
+                • Columns are orthonormal<br>
+                • det = ±1<br>
+                • Inverse = Transpose
+            `;
+
+            matrixDiv.innerHTML = `
+                Q = 
+                [${matrix[0][0].toFixed(2)} ${matrix[0][1].toFixed(2)}]
+                [${matrix[1][0].toFixed(2)} ${matrix[1][1].toFixed(2)}]
+            `;
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+
+            switch(mode) {
+                case 'transform':
+                    drawTransformations();
+                    break;
+                case 'determinant':
+                    drawDeterminant();
+                    break;
+                case 'orthogonal':
+                    drawOrthogonal();
+                    break;
+            }
+        }
+
+        function animate() {
+            if(isAnimating) {
+                time += 0.02;
+                draw();
+                requestAnimationFrame(animate);
+            }
+        }
+
+        // Event Listeners
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                mode = tab.dataset.mode;
+                draw();
+            });
+        });
+
+        canvas.addEventListener('mousedown', e => {
+            isDragging = true;
+            lastMouse = { x: e.clientX, y: e.clientY };
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if(isDragging) {
+                const dx = e.clientX - lastMouse.x;
+                time += dx * 0.01;
+                lastMouse = { x: e.clientX, y: e.clientY };
+                if(!isAnimating) draw();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        document.addEventListener('keydown', e => {
+            if(e.key === ' ') {
+                isAnimating = !isAnimating;
+                if(isAnimating) animate();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        });
+
+        animate();
+    </script>
+</body>
+</html>

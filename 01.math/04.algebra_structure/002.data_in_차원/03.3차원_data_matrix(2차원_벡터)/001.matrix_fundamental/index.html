@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            background: black;
+            color: white;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        .visualization {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            width: 100vw;
+            height: 100vh;
+        }
+        .canvas-container {
+            position: relative;
+            border: 1px solid #333;
+            overflow: hidden;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+        .info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            z-index: 1000;
+        }
+        .matrix-value {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        input[type="number"] {
+            width: 60px;
+            margin: 0 5px;
+            background: #333;
+            color: white;
+            border: none;
+            padding: 5px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="visualization">
+        <div class="canvas-container">
+            <canvas id="column-canvas"></canvas>
+            <div class="info">
+                Column Vector View<br>
+                A = [a₁ a₂]<br>
+                • Yellow: First column [a₁₁; a₂₁]<br>
+                • Blue: Second column [a₁₂; a₂₂]<br>
+                • Green: Linear combination
+            </div>
+        </div>
+        <div class="canvas-container">
+            <canvas id="transform-canvas"></canvas>
+            <div class="info">
+                Linear Transformation<br>
+                • Red: Standard basis<br>
+                • Green: Transformed basis<br>
+                • Grid shows how space transforms<br>
+                Determinant = area scaling
+            </div>
+        </div>
+        <div class="canvas-container">
+            <canvas id="eigenspace-canvas"></canvas>
+            <div class="info">
+                Eigenspace View<br>
+                • Purple: Eigenvectors<br>
+                • Shows scaling directions<br>
+                • λ₁, λ₂: scaling factors<br>
+                Direction preserved under transform
+            </div>
+        </div>
+        <div class="canvas-container">
+            <canvas id="3d-canvas"></canvas>
+            <div class="info">
+                3D Interpretation<br>
+                • Matrix as surface<br>
+                • Height = matrix values<br>
+                • Shows linear dependency
+            </div>
+        </div>
+    </div>
+    <div id="controls">
+        Matrix [a₁₁ a₁₂; a₂₁ a₂₂]:
+        <input type="number" id="a11" value="1" step="0.1">
+        <input type="number" id="a12" value="2" step="0.1">
+        <br>
+        <input type="number" id="a21" value="0" step="0.1">
+        <input type="number" id="a22" value="1" step="0.1">
+        <br>
+        <button id="reset-btn">Reset Matrix</button>
+    </div>
+    <script>
+        // Initialize canvases
+        const columnCanvas = document.getElementById('column-canvas');
+        const transformCanvas = document.getElementById('transform-canvas');
+        const eigenCanvas = document.getElementById('eigenspace-canvas');
+        const canvas3d = document.getElementById('3d-canvas');
+
+        const columnCtx = columnCanvas.getContext('2d');
+        const transformCtx = transformCanvas.getContext('2d');
+        const eigenCtx = eigenCanvas.getContext('2d');
+        const ctx3d = canvas3d.getContext('2d');
+
+        // Matrix state
+        let matrix = {
+            a11: 1, a12: 2,
+            a21: 0, a22: 1
+        };
+
+        // Set canvas sizes
+        function resizeCanvases() {
+            [columnCanvas, transformCanvas, eigenCanvas, canvas3d].forEach(canvas => {
+                const container = canvas.parentElement;
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+            });
+        }
+        resizeCanvases();
+        window.addEventListener('resize', resizeCanvases);
+
+        // Utility functions
+        function toScreen(canvas, x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 8;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2 - y * scale
+            };
+        }
+
+        function drawGrid(ctx) {
+            const canvas = ctx.canvas;
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            
+            // Draw grid
+            for(let i = -10; i <= 10; i++) {
+                const start1 = toScreen(canvas, i, -10);
+                const end1 = toScreen(canvas, i, 10);
+                const start2 = toScreen(canvas, -10, i);
+                const end2 = toScreen(canvas, 10, i);
+                
+                ctx.beginPath();
+                ctx.moveTo(start1.x, start1.y);
+                ctx.lineTo(end1.x, end1.y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+            }
+        }
+
+        function drawVector(ctx, vec, color = '#ffff00', width = 2, label = '', start = {x: 0, y: 0}) {
+            const startPoint = toScreen(ctx.canvas, start.x, start.y);
+            const endPoint = toScreen(ctx.canvas, start.x + vec.x, start.y + vec.y);
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(startPoint.x, startPoint.y);
+            ctx.lineTo(endPoint.x, endPoint.y);
+            ctx.stroke();
+
+            // Arrow head
+            const angle = Math.atan2(endPoint.y - startPoint.y, endPoint.x - startPoint.x);
+            ctx.beginPath();
+            ctx.moveTo(endPoint.x, endPoint.y);
+            ctx.lineTo(
+                endPoint.x - 15 * Math.cos(angle - Math.PI/6),
+                endPoint.y - 15 * Math.sin(angle - Math.PI/6)
+            );
+            ctx.lineTo(
+                endPoint.x - 15 * Math.cos(angle + Math.PI/6),
+                endPoint.y - 15 * Math.sin(angle + Math.PI/6)
+            );
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            if(label) {
+                ctx.fillStyle = color;
+                ctx.font = '16px monospace';
+                ctx.fillText(label, endPoint.x + 10, endPoint.y);
+            }
+        }
+
+        function drawColumnVectors() {
+            columnCtx.fillStyle = 'black';
+            columnCtx.fillRect(0, 0, columnCanvas.width, columnCanvas.height);
+            
+            drawGrid(columnCtx);
+            
+            // Draw first column vector
+            const col1 = {x: matrix.a11, y: matrix.a21};
+            drawVector(columnCtx, col1, '#ffff00', 2, 'a₁');
+            
+            // Draw second column vector
+            const col2 = {x: matrix.a12, y: matrix.a22};
+            drawVector(columnCtx, col2, '#4444ff', 2, 'a₂');
+            
+            // Draw parallelogram
+            const sumPoint = {
+                x: matrix.a11 + matrix.a12,
+                y: matrix.a21 + matrix.a22
+            };
+            
+            columnCtx.strokeStyle = '#44ff44';
+            columnCtx.setLineDash([5, 5]);
+            const origin = toScreen(columnCanvas, 0, 0);
+            const col1End = toScreen(columnCanvas, col1.x, col1.y);
+            const col2End = toScreen(columnCanvas, col2.x, col2.y);
+            const sumEnd = toScreen(columnCanvas, sumPoint.x, sumPoint.y);
+            
+            columnCtx.beginPath();
+            columnCtx.moveTo(col1End.x, col1End.y);
+            columnCtx.lineTo(sumEnd.x, sumEnd.y);
+            columnCtx.moveTo(col2End.x, col2End.y);
+            columnCtx.lineTo(sumEnd.x, sumEnd.y);
+            columnCtx.stroke();
+            columnCtx.setLineDash([]);
+        }
+
+        function drawTransformation() {
+            transformCtx.fillStyle = 'black';
+            transformCtx.fillRect(0, 0, transformCanvas.width, transformCanvas.height);
+            
+            // Draw original grid
+            drawGrid(transformCtx);
+            
+            // Draw transformed grid
+            transformCtx.strokeStyle = '#1a3333';
+            const gridSize = 5;
+            for(let i = -gridSize; i <= gridSize; i++) {
+                for(let j = -gridSize; j <= gridSize; j++) {
+                    // Transform points
+                    const p = transformPoint({x: i, y: j});
+                    const px = transformPoint({x: i+1, y: j});
+                    const py = transformPoint({x: i, y: j+1});
+                    
+                    const start = toScreen(transformCanvas, p.x, p.y);
+                    const endX = toScreen(transformCanvas, px.x, px.y);
+                    const endY = toScreen(transformCanvas, py.x, py.y);
+                    
+                    transformCtx.beginPath();
+                    transformCtx.moveTo(start.x, start.y);
+                    transformCtx.lineTo(endX.x, endX.y);
+                    transformCtx.stroke();
+                    
+                    transformCtx.beginPath();
+                    transformCtx.moveTo(start.x, start.y);
+                    transformCtx.lineTo(endY.x, endY.y);
+                    transformCtx.stroke();
+                }
+            }
+            
+            // Add drawing of standard basis vectors in red
+            drawVector(transformCtx, {x: 1, y: 0}, '#ff4444', 2, 'x₁');
+            drawVector(transformCtx, {x: 0, y: 1}, '#ff4444', 2, 'x₂');
+            
+            // Draw transformed basis vectors (already exists)
+            drawVector(transformCtx, {x: matrix.a11, y: matrix.a21}, '#44ff44', 2, 'Ax₁');
+            drawVector(transformCtx, {x: matrix.a12, y: matrix.a22}, '#44ff44', 2, 'Ax₂');
+            
+            // Show determinant more prominently
+            const det = matrix.a11 * matrix.a22 - matrix.a12 * matrix.a21;
+            transformCtx.fillStyle = '#ffffff';
+            transformCtx.font = '16px monospace';
+            transformCtx.fillText(`det(A) = ${det.toFixed(2)}`, 10, 30);
+            
+            // Add area scaling info
+            if (Math.abs(det) > 1) {
+                transformCtx.fillText('Area expands by ' + Math.abs(det).toFixed(2) + '×', 10, 50);
+            } else if (Math.abs(det) < 1) {
+                transformCtx.fillText('Area shrinks by ' + (1/Math.abs(det)).toFixed(2) + '×', 10, 50);
+            }
+            if (det < 0) {
+                transformCtx.fillText('Orientation flips', 10, 70);
+            }
+        }
+
+        function transformPoint(p) {
+            return {
+                x: matrix.a11 * p.x + matrix.a12 * p.y,
+                y: matrix.a21 * p.x + matrix.a22 * p.y
+            };
+        }
+
+        function calculateEigenvectors() {
+            // Calculate eigenvalues using characteristic equation
+            const a = 1;
+            const b = -(matrix.a11 + matrix.a22);
+            const c = matrix.a11 * matrix.a22 - matrix.a12 * matrix.a21;
+            
+            const discriminant = Math.sqrt(b*b - 4*a*c);
+            const λ1 = (-b + discriminant) / (2*a);
+            const λ2 = (-b - discriminant) / (2*a);
+            
+            // Calculate eigenvectors
+            function getEigenvector(λ) {
+                const v1 = matrix.a12;
+                const v2 = λ - matrix.a11;
+                const len = Math.sqrt(v1*v1 + v2*v2);
+                return {
+                    x: v1/len,
+                    y: v2/len,
+                    λ: λ
+                };
+            }
+            
+            return [getEigenvector(λ1), getEigenvector(λ2)];
+        }
+
+        function drawEigenspace() {
+            eigenCtx.fillStyle = 'black';
+            eigenCtx.fillRect(0, 0, eigenCanvas.width, eigenCanvas.height);
+            
+            drawGrid(eigenCtx);
+            
+            const eigenvectors = calculateEigenvectors();
+            
+            // Draw eigenvectors
+            eigenvectors.forEach((ev, i) => {
+                // Draw original eigenvector
+                drawVector(eigenCtx, ev, '#ff44ff', 2, `e${i+1}`);
+                
+                // Draw transformed eigenvector (scaled by eigenvalue)
+                const transformed = {
+                    x: ev.x * ev.λ,
+                    y: ev.y * ev.λ
+                };
+                drawVector(eigenCtx, transformed, '#ff44ff', 2, `λ${i+1}e${i+1}`);
+                
+                // Show eigenvalue
+                eigenCtx.fillStyle = '#ffffff';
+                eigenCtx.fillText(`λ${i+1} = ${ev.λ.toFixed(2)}`, 10, 30 + i * 20);
+            });
+        }
+
+        function draw3DView() {
+            ctx3d.fillStyle = 'black';
+            ctx3d.fillRect(0, 0, canvas3d.width, canvas3d.height);
+            
+            const centerX = canvas3d.width / 2;
+            const centerY = canvas3d.height / 2;
+            const scale = Math.min(canvas3d.width, canvas3d.height) / 4;
+            
+            // 3D projection parameters
+            const angleX = Math.PI / 6;  // rotation around X axis
+            const angleY = Math.PI / 4;  // rotation around Y axis
+            
+            // Project 3D point to 2D
+            function project3D(x, y, z) {
+                // First rotate around Y axis
+                const x1 = x * Math.cos(angleY) - z * Math.sin(angleY);
+                const z1 = x * Math.sin(angleY) + z * Math.cos(angleY);
+                
+                // Then rotate around X axis
+                const y2 = y * Math.cos(angleX) - z1 * Math.sin(angleX);
+                const z2 = y * Math.sin(angleX) + z1 * Math.cos(angleX);
+                
+                // Project to 2D plane
+                return {
+                    x: centerX + x1 * scale,
+                    y: centerY + y2 * scale,
+                    z: z2  // Keep z for depth sorting
+                };
+            }
+
+            // Create surface points
+            const points = [];
+            const resolution = 20;
+            for(let i = 0; i <= resolution; i++) {
+                for(let j = 0; j <= resolution; j++) {
+                    const x = (i / resolution) * 2 - 1;  // -1 to 1
+                    const y = (j / resolution) * 2 - 1;  // -1 to 1
+                    
+                    // Bilinear interpolation of matrix values
+                    const z = matrix.a11 * (1-x) * (1-y) +
+                            matrix.a12 * x * (1-y) +
+                            matrix.a21 * (1-x) * y +
+                            matrix.a22 * x * y;
+                    
+                    points.push({
+                        x: x,
+                        y: y,
+                        z: z / 4,  // Scale down z for better visualization
+                        projected: null
+                    });
+                }
+            }
+
+            // Project all points
+            points.forEach(p => {
+                p.projected = project3D(p.x, p.y, p.z);
+            });
+
+            // Draw grid lines
+            ctx3d.strokeStyle = '#333';
+            ctx3d.lineWidth = 1;
+            
+            for(let i = 0; i <= resolution; i++) {
+                // Horizontal lines
+                ctx3d.beginPath();
+                for(let j = 0; j <= resolution; j++) {
+                    const point = points[i * (resolution + 1) + j].projected;
+                    if(j === 0) ctx3d.moveTo(point.x, point.y);
+                    else ctx3d.lineTo(point.x, point.y);
+                }
+                ctx3d.stroke();
+                
+                // Vertical lines
+                ctx3d.beginPath();
+                for(let j = 0; j <= resolution; j++) {
+                    const point = points[j * (resolution + 1) + i].projected;
+                    if(j === 0) ctx3d.moveTo(point.x, point.y);
+                    else ctx3d.lineTo(point.x, point.y);
+                }
+                ctx3d.stroke();
+            }
+
+            // Draw corner points and values
+            const corners = [
+                {x: -1, y: -1, z: matrix.a11},
+                {x: 1, y: -1, z: matrix.a12},
+                {x: -1, y: 1, z: matrix.a21},
+                {x: 1, y: 1, z: matrix.a22}
+            ];
+
+            corners.forEach(corner => {
+                const proj = project3D(corner.x, corner.y, corner.z / 4);
+                ctx3d.fillStyle = '#ff0';
+                ctx3d.beginPath();
+                ctx3d.arc(proj.x, proj.y, 4, 0, Math.PI * 2);
+                ctx3d.fill();
+                
+                // Label with value
+                ctx3d.fillStyle = '#fff';
+                ctx3d.fillText(corner.z.toFixed(2), proj.x + 5, proj.y + 5);
+            });
+
+        // // Add axis labels
+        // ctx3d.fillStyle = '#fff';
+        // const origin = project3D(0, 0, 0);
+        // const xAxis = project3D(1.2, 0, 0);
+        // const yAxis = project3D(0, 1.2, 0);
+        // const zAxis = project3D(0, 0, 1.2);
+        
+        // ctx3d.fillText('X', xAxis.x, xAxis.y);
+        // ctx3d.fillText('Y', yAxis.x, yAxis.y);
+        // ctx3d.fillText('Z', zAxis.x, zAxis.y);
+
+        // Draw coordinate axes more prominently
+        const axisLength = 1.5;  // Make axes longer
+        
+        // X axis (red)
+        ctx3d.strokeStyle = '#ff4444';
+        ctx3d.lineWidth = 2;
+        ctx3d.beginPath();
+        const origin = project3D(0, 0, 0);
+        const xEnd = project3D(axisLength, 0, 0);
+        ctx3d.moveTo(origin.x, origin.y);
+        ctx3d.lineTo(xEnd.x, xEnd.y);
+        ctx3d.stroke();
+        
+        // Y axis (green)
+        ctx3d.strokeStyle = '#44ff44';
+        const yEnd = project3D(0, axisLength, 0);
+        ctx3d.beginPath();
+        ctx3d.moveTo(origin.x, origin.y);
+        ctx3d.lineTo(yEnd.x, yEnd.y);
+        ctx3d.stroke();
+        
+        // Z axis (blue)
+        ctx3d.strokeStyle = '#4444ff';
+        const zEnd = project3D(0, 0, axisLength);
+        ctx3d.beginPath();
+        ctx3d.moveTo(origin.x, origin.y);
+        ctx3d.lineTo(zEnd.x, zEnd.y);
+        ctx3d.stroke();
+        
+        // Draw axis labels more prominently
+        ctx3d.font = '16px monospace';
+        ctx3d.fillStyle = '#ff4444';
+        ctx3d.fillText('X', xEnd.x + 5, xEnd.y);
+        ctx3d.fillStyle = '#44ff44';
+        ctx3d.fillText('Y', yEnd.x + 5, yEnd.y);
+        ctx3d.fillStyle = '#4444ff';
+        ctx3d.fillText('Z', zEnd.x + 5, zEnd.y);
+    }
+
+    // Event handlers for matrix inputs
+    const inputs = ['a11', 'a12', 'a21', 'a22'].map(id => document.getElementById(id));
+    inputs.forEach(input => {
+        input.addEventListener('input', () => {
+            matrix[input.id] = parseFloat(input.value);
+            drawAll();
+        });
+    });
+
+    // Reset button
+    document.getElementById('reset-btn').addEventListener('click', () => {
+        matrix = {a11: 1, a12: 2, a21: 0, a22: 1};
+        inputs.forEach(input => {
+            input.value = matrix[input.id];
+        });
+        drawAll();
+    });
+
+    function drawAll() {
+        drawColumnVectors();
+        drawTransformation();
+        drawEigenspace();
+        draw3DView();
+    }
+
+    // Initialize
+    drawAll();
+</script>
+</body>
+</html>

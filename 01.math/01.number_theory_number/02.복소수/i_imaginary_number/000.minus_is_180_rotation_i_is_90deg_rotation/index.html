@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            background: black;
+            color: white;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        canvas { display: block; }
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 300px;
+        }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="info">
+        <span id="explanation">Click buttons below to see how numbers transform</span><br><br>
+        • ×1: No rotation<br>
+        • ×(-1): 180° rotation on real axis<br>
+        • ×i: 90° rotation, adds imaginary axis<br>
+        • ×i²: Two 90° rotations = -1<br>
+        Current value: <span id="currentValue">1</span>
+    </div>
+    <div id="controls">
+        <button onclick="multiplyBy(-1)">×(-1)</button>
+        <button onclick="multiplyBy('i')">×i</button>
+        <button onclick="reset()">Reset</button>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const explanationDiv = document.getElementById('explanation');
+        const valueSpan = document.getElementById('currentValue');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let currentState = {
+            value: 1,       // Current number
+            isImaginary: false,  // Whether we're on imaginary axis
+            showImaginaryAxis: false,  // Whether to show imaginary axis
+            animating: false,
+            angle: 0,       // Current rotation angle
+            targetAngle: 0  // Target rotation angle
+        };
+
+        function toScreen(x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 8;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2 - y * scale
+            };
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            
+            for(let i = -10; i <= 10; i++) {
+                const start1 = toScreen(i, -10);
+                const end1 = toScreen(i, 10);
+                const start2 = toScreen(-10, i);
+                const end2 = toScreen(10, i);
+                
+                ctx.beginPath();
+                ctx.moveTo(start1.x, start1.y);
+                ctx.lineTo(end1.x, end1.y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+            }
+        }
+
+        function drawAxes() {
+            const origin = toScreen(0, 0);
+            
+            // Real axis
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            const xStart = toScreen(-2, 0);
+            const xEnd = toScreen(2, 0);
+            ctx.beginPath();
+            ctx.moveTo(xStart.x, xStart.y);
+            ctx.lineTo(xEnd.x, xEnd.y);
+            ctx.stroke();
+            ctx.fillStyle = '#ff4444';
+            ctx.fillText('Real', xEnd.x + 10, xEnd.y);
+
+            // Imaginary axis (fades in when needed)
+            if(currentState.showImaginaryAxis) {
+                ctx.strokeStyle = '#44ff44';
+                const yStart = toScreen(0, -2);
+                const yEnd = toScreen(0, 2);
+                ctx.beginPath();
+                ctx.moveTo(yStart.x, yStart.y);
+                ctx.lineTo(yEnd.x, yEnd.y);
+                ctx.stroke();
+                ctx.fillStyle = '#44ff44';
+                ctx.fillText('Imaginary', yEnd.x - 30, yEnd.y - 20);
+            }
+
+            // Draw unit circle (semi-transparent)
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.beginPath();
+            ctx.arc(origin.x, origin.y, Math.min(canvas.width, canvas.height)/8, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        function drawNumber(angle) {
+            const magnitude = 1;  // Unit magnitude
+            const x = Math.cos(angle) * magnitude;
+            const y = Math.sin(angle) * magnitude;
+            
+            const origin = toScreen(0, 0);
+            const point = toScreen(x, y);
+            
+            // Draw vector
+            ctx.strokeStyle = currentState.isImaginary ? '#44ff44' : '#ff4444';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(point.x, point.y);
+            ctx.stroke();
+
+            // Draw arrowhead
+            const headLen = 15;
+            const angle_arrow = Math.atan2(point.y - origin.y, point.x - origin.x);
+            ctx.beginPath();
+            ctx.moveTo(point.x, point.y);
+            ctx.lineTo(
+                point.x - headLen * Math.cos(angle_arrow - Math.PI/6),
+                point.y - headLen * Math.sin(angle_arrow - Math.PI/6)
+            );
+            ctx.lineTo(
+                point.x - headLen * Math.cos(angle_arrow + Math.PI/6),
+                point.y - headLen * Math.sin(angle_arrow + Math.PI/6)
+            );
+            ctx.fillStyle = currentState.isImaginary ? '#44ff44' : '#ff4444';
+            ctx.fill();
+
+            // Draw angle arc
+            if(angle !== 0) {
+                ctx.strokeStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(origin.x, origin.y, 30, 0, -angle);
+                ctx.stroke();
+            }
+        }
+
+        function updateValueDisplay() {
+            if(currentState.isImaginary) {
+                valueSpan.textContent = currentState.value + 'i';
+            } else {
+                valueSpan.textContent = currentState.value;
+            }
+        }
+
+        function multiplyBy(factor) {
+            if(factor === -1) {
+                currentState.targetAngle += Math.PI;
+                currentState.value *= -1;
+                explanationDiv.textContent = "Rotating 180° on real axis";
+            } else if(factor === 'i') {
+                currentState.targetAngle -= Math.PI/2;  // Clockwise 90°
+                currentState.showImaginaryAxis = true;
+                currentState.isImaginary = !currentState.isImaginary;
+                if(currentState.isImaginary) {
+                    explanationDiv.textContent = "Rotating 90° to imaginary axis";
+                } else {
+                    currentState.value *= -1;
+                    explanationDiv.textContent = "Another 90° rotation gives -1";
+                }
+            }
+            currentState.animating = true;
+            animate();
+            updateValueDisplay();
+        }
+
+        function reset() {
+            currentState = {
+                value: 1,
+                isImaginary: false,
+                showImaginaryAxis: false,
+                animating: false,
+                angle: 0,
+                targetAngle: 0
+            };
+            explanationDiv.textContent = "Click buttons below to see how numbers transform";
+            updateValueDisplay();
+            draw();
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+            drawAxes();
+            drawNumber(currentState.angle);
+        }
+
+        function animate() {
+            if(Math.abs(currentState.angle - currentState.targetAngle) > 0.01) {
+                currentState.angle += (currentState.targetAngle - currentState.angle) * 0.1;
+                draw();
+                requestAnimationFrame(animate);
+            } else {
+                currentState.angle = currentState.targetAngle;
+                currentState.animating = false;
+                draw();
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        });
+
+        draw();
+    </script>
+</body>
+</html>

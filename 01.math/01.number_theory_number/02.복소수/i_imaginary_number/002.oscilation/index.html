@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            background: black;
+            color: white;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        canvas { display: block; }
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="info">
+        Euler's Formula:<br>
+        e^(iθ) = cos(θ) + i·sin(θ)<br><br>
+        • Complex point (blue)<br>
+        • Cosine component (red)<br>
+        • Sine component (green)<br>
+        • Angle: <span id="angle">0°</span>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const angleSpan = document.getElementById('angle');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let isAnimating = true;
+        let time = 0;
+
+        function toScreen(x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 8;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2 - y * scale
+            };
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            
+            for(let i = -10; i <= 10; i++) {
+                const start1 = toScreen(i, -10);
+                const end1 = toScreen(i, 10);
+                const start2 = toScreen(-10, i);
+                const end2 = toScreen(10, i);
+                
+                ctx.beginPath();
+                ctx.moveTo(start1.x, start1.y);
+                ctx.lineTo(end1.x, end1.y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+            }
+        }
+
+        function drawAxes() {
+            // Real axis
+            ctx.strokeStyle = '#ff4444';
+            const xStart = toScreen(-2, 0);
+            const xEnd = toScreen(2, 0);
+            ctx.beginPath();
+            ctx.moveTo(xStart.x, xStart.y);
+            ctx.lineTo(xEnd.x, xEnd.y);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = '#ff4444';
+            ctx.fillText('Re', xEnd.x + 10, xEnd.y);
+
+            // Imaginary axis
+            ctx.strokeStyle = '#44ff44';
+            const yStart = toScreen(0, -2);
+            const yEnd = toScreen(0, 2);
+            ctx.beginPath();
+            ctx.moveTo(yStart.x, yStart.y);
+            ctx.lineTo(yEnd.x, yEnd.y);
+            ctx.stroke();
+            ctx.fillStyle = '#44ff44';
+            ctx.fillText('Im', yEnd.x + 10, yEnd.y - 10);
+        }
+
+        function drawUnitCircle() {
+            const origin = toScreen(0, 0);
+            const radius = Math.min(canvas.width, canvas.height) / 8;
+            
+            // Draw unit circle
+            ctx.strokeStyle = '#666';
+            ctx.beginPath();
+            ctx.arc(origin.x, origin.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        function drawRotatingPoint(angle) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            const origin = toScreen(0, 0);
+            const point = toScreen(cos, sin);
+
+            // Draw projection lines
+            ctx.setLineDash([5, 5]);
+            
+            // Cosine projection (to real axis)
+            ctx.strokeStyle = '#ff4444';
+            ctx.beginPath();
+            ctx.moveTo(point.x, point.y);
+            ctx.lineTo(toScreen(cos, 0).x, toScreen(cos, 0).y);
+            ctx.stroke();
+
+            // Sine projection (to imaginary axis)
+            ctx.strokeStyle = '#44ff44';
+            ctx.beginPath();
+            ctx.moveTo(point.x, point.y);
+            ctx.lineTo(toScreen(0, sin).x, toScreen(0, sin).y);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+
+            // Draw radius line
+            ctx.strokeStyle = '#4488ff';
+            ctx.beginPath();
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(point.x, point.y);
+            ctx.stroke();
+
+            // Draw point
+            ctx.fillStyle = '#4488ff';
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw sine and cosine waves
+            const waveScale = 2;
+            const wavePoints = 100;
+            const waveRange = 4;  // x-axis range for waves
+
+            // Cosine wave
+            ctx.strokeStyle = '#ff4444';
+            ctx.beginPath();
+            for(let i = 0; i <= wavePoints; i++) {
+                const x = (i/wavePoints * waveRange) - waveRange/2;
+                const y = Math.cos(x + angle);
+                if(i === 0) ctx.moveTo(...Object.values(toScreen(x, y/waveScale + 2)));
+                else ctx.lineTo(...Object.values(toScreen(x, y/waveScale + 2)));
+            }
+            ctx.stroke();
+
+            // Sine wave
+            ctx.strokeStyle = '#44ff44';
+            ctx.beginPath();
+            for(let i = 0; i <= wavePoints; i++) {
+                const x = (i/wavePoints * waveRange) - waveRange/2;
+                const y = Math.sin(x + angle);
+                if(i === 0) ctx.moveTo(...Object.values(toScreen(x, y/waveScale - 2)));
+                else ctx.lineTo(...Object.values(toScreen(x, y/waveScale - 2)));
+            }
+            ctx.stroke();
+
+            // Highlight current values on waves
+            ctx.fillStyle = '#ff4444';
+            ctx.beginPath();
+            ctx.arc(...Object.values(toScreen(0, cos/waveScale + 2)), 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#44ff44';
+            ctx.beginPath();
+            ctx.arc(...Object.values(toScreen(0, sin/waveScale - 2)), 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Update angle display
+            angleSpan.textContent = `${((angle * 180 / Math.PI) % 360).toFixed(0)}°`;
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+            drawAxes();
+            drawUnitCircle();
+            drawRotatingPoint(time);
+        }
+
+        function animate() {
+            if(isAnimating) {
+                time += 0.02;
+                draw();
+                requestAnimationFrame(animate);
+            }
+        }
+
+        document.addEventListener('keydown', e => {
+            if(e.key === ' ') {
+                isAnimating = !isAnimating;
+                if(isAnimating) animate();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        });
+
+        animate();
+    </script>
+</body>
+</html>

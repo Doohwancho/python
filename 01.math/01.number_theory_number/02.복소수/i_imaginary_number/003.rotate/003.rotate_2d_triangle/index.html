@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rotate Triangle Using Complex Numbers</title>
+</head>
+<body>
+<canvas id="canvas" width="500" height="500"></canvas>
+<script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    // Original triangle vertices
+    const triangle = [
+        { x: 100, y: 50 },
+        { x: 150, y: 150 },
+        { x: 50, y: 150 },
+    ];
+
+    // Rotation function using complex multiplication
+    function rotatePoint(point, angle) {
+        const theta = angle * (Math.PI / 180); // Convert to radians
+        const cosTheta = Math.cos(theta);
+        const sinTheta = Math.sin(theta);
+
+        // Complex rotation: (x + yi) * (cosθ + i*sinθ)
+        const x = point.x * cosTheta - point.y * sinTheta;
+        const y = point.x * sinTheta + point.y * cosTheta;
+
+        return { x, y };
+    }
+
+    // Rotate all triangle points
+    const rotatedTriangle = triangle.map(point => {
+        const translatedPoint = {
+            x: point.x - centerX,
+            y: point.y - centerY
+        };
+        const rotated = rotatePoint(translatedPoint, 90);
+        return {
+            x: rotated.x + centerX,
+            y: rotated.y + centerY
+        };
+    });
+
+    // Draw a triangle
+    function drawTriangle(points, color) {
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    // Draw the original and rotated triangles
+    drawTriangle(triangle, "blue");
+    drawTriangle(rotatedTriangle, "red");
+
+    // Add labels
+    ctx.fillStyle = "black";
+    ctx.fillText("Original Triangle (Blue)", 10, 20);
+    ctx.fillText("Rotated Triangle (Red)", 10, 40);
+</script>
+</body>
+</html>

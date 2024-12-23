@@ -96,7 +96,18 @@ build vector map of math for machine learning bottom up
 # C. Subjects
 
 
-a. number_theory\
+a. number_theory
+
+1. pi
+2. 복소수
+	1. i
+		1. euler's formula
+		2. fourier_transformation
+	2. real_number
+3. log & exponential
+4. e
+5. quaternion
+
 b. geometry\
 c. calculus\
 d. algebra\

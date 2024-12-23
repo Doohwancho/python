@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { 
+            margin: 0; 
+            background: black; 
+            color: white; 
+            font-family: monospace;
+            overflow: hidden;
+        }
+        canvas { 
+            display: block; 
+        }
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 300px;
+        }
+        #value {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="info">
+        Press:<br>
+        1: Discrete (동전 던지기)<br>
+        2: Discrete (주사위)<br>
+        3: Continuous (키 분포)<br>
+        Mouse: Move to see probabilities
+    </div>
+    <div id="value"></div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const info = document.getElementById('info');
+        const value = document.getElementById('value');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let mode = 1;
+        let mouseX = 0;
+        let mouseY = 0;
+
+        function toScreen(x, y) {
+            return {
+                x: x * (canvas.width/800) + canvas.width/2,
+                y: canvas.height/2 - y * (canvas.height/400)
+            };
+        }
+
+        function fromScreen(x, y) {
+            return {
+                x: (x - canvas.width/2) / (canvas.width/800),
+                y: -(y - canvas.height/2) / (canvas.height/400)
+            };
+        }
+
+        function drawAxes() {
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 2;
+            
+            // X axis
+            const origin = toScreen(0, 0);
+            ctx.beginPath();
+            ctx.moveTo(toScreen(-350, 0).x, origin.y);
+            ctx.lineTo(toScreen(350, 0).x, origin.y);
+            ctx.stroke();
+            
+            // Y axis
+            ctx.beginPath();
+            ctx.moveTo(origin.x, toScreen(0, -150).y);
+            ctx.lineTo(origin.x, toScreen(0, 150).y);
+            ctx.stroke();
+
+            // Draw axis labels
+            ctx.fillStyle = '#fff';
+            ctx.font = '14px monospace';
+            ctx.fillText('X (Random Variable)', toScreen(300, -20).x, toScreen(0, -20).y);
+            ctx.save();
+            ctx.translate(toScreen(-300, 100).x, toScreen(-300, 100).y);
+            ctx.rotate(-Math.PI/2);
+            ctx.fillText('Probability', 0, 0);
+            ctx.restore();
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            
+            // Vertical lines
+            for(let x = -300; x <= 300; x += 50) {
+                const start = toScreen(x, -150);
+                const end = toScreen(x, 150);
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+            }
+            
+            // Horizontal lines
+            for(let y = -150; y <= 150; y += 50) {
+                const start = toScreen(-300, y);
+                const end = toScreen(300, y);
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+            }
+        }
+
+        function drawCoinFlip() {
+            // Draw probability bars
+            ctx.fillStyle = '#4488ff';
+            
+            // P(X=0) = 0.5 (Tail)
+            const bar1 = toScreen(-50, 0);
+            const bar1Height = toScreen(0, 100).y - toScreen(0, 0).y;
+            ctx.fillRect(bar1.x-20, bar1.y-bar1Height, 40, bar1Height);
+            
+            // P(X=1) = 0.5 (Head)
+            const bar2 = toScreen(50, 0);
+            const bar2Height = toScreen(0, 100).y - toScreen(0, 0).y;
+            ctx.fillRect(bar2.x-20, bar2.y-bar2Height, 40, bar2Height);
+
+            // Labels
+            ctx.fillStyle = '#fff';
+            ctx.fillText('Tail (0)', bar1.x-20, bar1.y+20);
+            ctx.fillText('Head (1)', bar2.x-20, bar2.y+20);
+            ctx.fillText('P(X) = 0.5', bar1.x-25, bar1.y-bar1Height-10);
+            ctx.fillText('P(X) = 0.5', bar2.x-25, bar2.y-bar2Height-10);
+
+            value.innerHTML = `
+                Discrete Random Variable (동전 던지기)<br>
+                PMF (Probability Mass Function)<br>
+                P(X=0) = 0.5 (Tail)<br>
+                P(X=1) = 0.5 (Head)<br>
+                Σ P(X) = 1
+            `;
+        }
+
+        function drawDice() {
+            // Draw probability bars for dice
+            ctx.fillStyle = '#4488ff';
+            const barWidth = 30;
+            const prob = 1/6;
+            
+            for(let i = 1; i <= 6; i++) {
+                const x = -175 + i * 50;
+                const barHeight = (toScreen(0, 100).y - toScreen(0, 0).y) * prob;
+                ctx.fillRect(toScreen(x, 0).x-barWidth/2, toScreen(0, 0).y-barHeight, barWidth, barHeight);
+                ctx.fillStyle = '#fff';
+                ctx.fillText(`${i}`, toScreen(x, 0).x-5, toScreen(0, 0).y+20);
+                ctx.fillText(`1/6`, toScreen(x, 0).x-10, toScreen(0, 0).y-barHeight-10);
+                ctx.fillStyle = '#4488ff';
+            }
+
+            value.innerHTML = `
+                Discrete Random Variable (주사위)<br>
+                PMF (Probability Mass Function)<br>
+                P(X=i) = 1/6 for i=1,2,3,4,5,6<br>
+                Σ P(X) = 1
+            `;
+        }
+
+        function normalDist(x, mean, std) {
+            return Math.exp(-0.5 * Math.pow((x - mean) / std, 2)) / (std * Math.sqrt(2 * Math.PI));
+        }
+
+        function drawHeight() {
+            // Draw normal distribution curve
+            ctx.beginPath();
+            ctx.strokeStyle = '#4488ff';
+            ctx.lineWidth = 2;
+            
+            const mean = 170;
+            const std = 10;
+            
+            let start = true;
+            for(let x = 130; x <= 210; x += 0.5) {
+                const y = normalDist(x, mean, std) * 2000; // Scale for visibility
+                const point = toScreen(x-mean, y);
+                
+                if(start) {
+                    ctx.moveTo(point.x, point.y);
+                    start = false;
+                } else {
+                    ctx.lineTo(point.x, point.y);
+                }
+            }
+            ctx.stroke();
+
+            // If mouse is over the graph, show area calculation
+            const mouse = fromScreen(mouseX, mouseY);
+            if(Math.abs(mouse.x) < 40 && mouse.y > 0) {
+                // Highlight area under curve
+                ctx.fillStyle = '#4488ff33';
+                ctx.beginPath();
+                let start = true;
+                for(let x = mean+mouse.x-10; x <= mean+mouse.x+10; x += 0.5) {
+                    const y = normalDist(x, mean, std) * 2000;
+                    const point = toScreen(x-mean, y);
+                    
+                    if(start) {
+                        ctx.moveTo(point.x, toScreen(0, 0).y);
+                        start = false;
+                    }
+                    ctx.lineTo(point.x, point.y);
+                }
+                ctx.lineTo(toScreen(mouse.x+10, 0).x, toScreen(0, 0).y);
+                ctx.fill();
+
+                // Show probability calculation
+                const x = mean + mouse.x;
+                value.innerHTML = `
+                    Continuous Random Variable (키)<br>
+                    PDF (Probability Density Function)<br>
+                    Height ≈ ${x.toFixed(1)}cm<br>
+                    P(${(x-10).toFixed(1)} ≤ X ≤ ${(x+10).toFixed(1)})<br>
+                    = ∫ f(x)dx ≈ ${(0.4 * Math.exp(-Math.pow(mouse.x/10, 2)/2)).toFixed(3)}
+                `;
+            } else {
+                value.innerHTML = `
+                    Continuous Random Variable (키)<br>
+                    PDF (Probability Density Function)<br>
+                    Move mouse to see probabilities<br>
+                    ∫f(x)dx = 1 (total probability)
+                `;
+            }
+
+            // X-axis labels
+            ctx.fillStyle = '#fff';
+            for(let x = 130; x <= 210; x += 10) {
+                const point = toScreen(x-mean, 0);
+                ctx.fillText(`${x}`, point.x-10, point.y+20);
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+            drawAxes();
+
+            switch(mode) {
+                case 1:
+                    drawCoinFlip();
+                    break;
+                case 2:
+                    drawDice();
+                    break;
+                case 3:
+                    drawHeight();
+                    break;
+            }
+        }
+
+        document.addEventListener('keydown', e => {
+            if(['1','2','3'].includes(e.key)) {
+                mode = parseInt(e.key);
+                draw();
+            }
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            draw();
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        });
+
+        draw();
+    </script>
+</body>
+</html>

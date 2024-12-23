@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title></title>
+	<style type="text/css">
+	html, body {
+		margin: 0px;
+	}
+	canvas {
+		display: block;
+	}
+	</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+	window.onload = function() {
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    const scale = Math.min(canvas.width, canvas.height) / 4;
+    let isAnimating = true;
+    let animationId = null;
+
+    const colors = {
+        function: "#ffffff",      // Original function
+        derivative: "#ff0000",    // First derivative
+        integral: "#00ff00",      // Integral
+        secant: "#ffff00",       // Secant line
+        tangent: "#00ffff",      // Tangent line
+        grid: "#333333",         // Grid
+        axis: "#ffffff"          // Axes
+    };
+
+    ctx.translate(canvas.width/2, canvas.height/2);
+    ctx.scale(1, -1);
+
+    function drawGrid() {
+        ctx.strokeStyle = colors.grid;
+        ctx.lineWidth = 0.5;
+
+        // Draw grid lines
+        for(let i = -canvas.width/2; i < canvas.width/2; i += scale/4) {
+            ctx.beginPath();
+            ctx.moveTo(i, -canvas.height/2);
+            ctx.lineTo(i, canvas.height/2);
+            ctx.stroke();
+        }
+        
+        for(let i = -canvas.height/2; i < canvas.height/2; i += scale/4) {
+            ctx.beginPath();
+            ctx.moveTo(-canvas.width/2, i);
+            ctx.lineTo(canvas.width/2, i);
+            ctx.stroke();
+        }
+    }
+
+    function drawAxes() {
+        ctx.strokeStyle = colors.axis;
+        ctx.lineWidth = 2;
+        
+        // X axis
+        ctx.beginPath();
+        ctx.moveTo(-canvas.width/2, 0);
+        ctx.lineTo(canvas.width/2, 0);
+        ctx.stroke();
+        
+        // Y axis
+        ctx.beginPath();
+        ctx.moveTo(0, -canvas.height/2);
+        ctx.lineTo(0, canvas.height/2);
+        ctx.stroke();
+
+        // Add arrows
+        const arrowSize = 10;
+        
+        // X-axis arrow
+        ctx.beginPath();
+        ctx.moveTo(canvas.width/2 - arrowSize, arrowSize);
+        ctx.lineTo(canvas.width/2, 0);
+        ctx.lineTo(canvas.width/2 - arrowSize, -arrowSize);
+        ctx.stroke();
+        
+        // Y-axis arrow
+        ctx.beginPath();
+        ctx.moveTo(-arrowSize, canvas.height/2 - arrowSize);
+        ctx.lineTo(0, canvas.height/2);
+        ctx.lineTo(arrowSize, canvas.height/2 - arrowSize);
+        ctx.stroke();
+    }
+
+    // Example function: sin(x)
+    function f(x) {
+        return Math.sin(x);
+    }
+
+    // Derivative approximation
+    function df(x, h = 0.0001) {
+        return (f(x + h) - f(x)) / h;
+    }
+
+    // Second derivative approximation
+    function d2f(x, h = 0.0001) {
+        return (df(x + h) - df(x)) / h;
+    }
+
+    function drawFunction(t) {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(-canvas.width/2, -canvas.height/2, canvas.width, canvas.height);
+        
+        drawGrid();
+        drawAxes();
+
+        // Draw original function
+        ctx.strokeStyle = colors.function;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for(let x = -4; x <= 4; x += 0.01) {
+            const xPos = x * scale;
+            const yPos = f(x) * scale;
+            if(x === -4) ctx.moveTo(xPos, yPos);
+            else ctx.lineTo(xPos, yPos);
+        }
+        ctx.stroke();
+
+        // Current point
+        const x = t;
+        const y = f(x);
+        const xPos = x * scale;
+        const yPos = y * scale;
+
+        // Draw tangent line
+        const slope = df(x);
+        ctx.strokeStyle = colors.tangent;
+        ctx.beginPath();
+        ctx.moveTo(xPos - scale, yPos - slope * scale);
+        ctx.lineTo(xPos + scale, yPos + slope * scale);
+        ctx.stroke();
+
+        // Draw area under curve (integral visualization)
+        ctx.fillStyle = colors.integral + "40"; // 40 for opacity
+        ctx.beginPath();
+        ctx.moveTo(-4 * scale, 0);
+        for(let x = -4; x <= t; x += 0.01) {
+            ctx.lineTo(x * scale, f(x) * scale);
+        }
+        ctx.lineTo(xPos, 0);
+        ctx.fill();
+
+        // Draw derivative curve
+        ctx.strokeStyle = colors.derivative;
+        ctx.beginPath();
+        for(let x = -4; x <= 4; x += 0.01) {
+            const xPos = x * scale;
+            const yPos = df(x) * scale;
+            if(x === -4) ctx.moveTo(xPos, yPos);
+            else ctx.lineTo(xPos, yPos);
+        }
+        ctx.stroke();
+
+        // Draw point markers
+        const pointSize = 5;
+        
+        // Point on original function
+        ctx.fillStyle = colors.function;
+        ctx.beginPath();
+        ctx.arc(xPos, yPos, pointSize, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Point on derivative
+        ctx.fillStyle = colors.derivative;
+        ctx.beginPath();
+        ctx.arc(xPos, df(x) * scale, pointSize, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Add labels
+        ctx.save();
+        ctx.scale(1, -1);
+        ctx.font = "16px Arial";
+        
+        // Function value
+        ctx.fillStyle = colors.function;
+        ctx.fillText(`f(${x.toFixed(2)}) = ${y.toFixed(2)}`, xPos + 10, -yPos);
+        
+        // Derivative value
+        ctx.fillStyle = colors.derivative;
+        ctx.fillText(`f'(${x.toFixed(2)}) = ${df(x).toFixed(2)}`, xPos + 10, -df(x) * scale - 20);
+        
+        // Integral value
+        let integral = 0;
+        for(let i = -4; i <= x; i += 0.01) {
+            integral += f(i) * 0.01;
+        }
+        ctx.fillStyle = colors.integral;
+        ctx.fillText(`∫f(x)dx = ${integral.toFixed(2)}`, -canvas.width/2 + 20, -canvas.height/2 + 30);
+
+        ctx.restore();
+    }
+
+    let t = -4;
+    function animate() {
+        if (isAnimating) {
+            drawFunction(t);
+            t += 0.02;
+            if(t > 4) t = -4;
+            animationId = requestAnimationFrame(animate);
+        }
+    }
+
+    document.addEventListener('keydown', function(event) {
+        if (event.code === 'Space') {
+            event.preventDefault();
+            isAnimating = !isAnimating;
+            if (isAnimating) animate();
+            else cancelAnimationFrame(animationId);
+        }
+    });
+
+    animate();
+};
+</script>
+</body>
+</html>

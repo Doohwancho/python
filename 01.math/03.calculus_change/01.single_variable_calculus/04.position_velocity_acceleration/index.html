@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Calculus Visualization</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #control-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            background: #333;
+            color: white;
+            border: 1px solid white;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #444;
+        }
+        button.active {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div id="control-panel"></div>
+    <canvas id="canvas"></canvas>
+<script>
+    window.onload = function() {
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Set canvas size
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const width = canvas.width;
+    const height = canvas.height;
+    const scale = Math.min(width, height) / 8;
+
+    // Center coordinate system
+    ctx.translate(width/2, height/2);
+    ctx.scale(1, -1);
+
+    let isAnimating = true;
+    let animationId = null;
+    let currentTime = 0;
+
+    const colors = {
+        position: "#00ff00",    // Green for position
+        velocity: "#ff0000",    // Red for velocity
+        acceleration: "#00ffff", // Cyan for acceleration
+        grid: "#333333",
+        axis: "#ffffff",
+        point: "#ffff00"
+    };
+
+    // Define motion functions
+    const motionTypes = {
+        uniformAcceleration: {
+            name: "Uniform Acceleration",
+            // s = ut + (1/2)at²
+            position: t => (2*t + 0.5*t*t) * scaleFactors.uniformAcceleration.position,
+            // v = u + at
+            velocity: t => (2 + t) * scaleFactors.uniformAcceleration.velocity,
+            // a = constant
+            acceleration: t => 1 * scaleFactors.uniformAcceleration.acceleration,
+            timeRange: [-4, 4]
+        },
+        sinusoidal: {
+            name: "Harmonic Motion",
+            position: t => Math.sin(t) * scale/2 * scaleFactors.sinusoidal.position,
+            velocity: t => Math.cos(t) * scale/2 * scaleFactors.sinusoidal.velocity,
+            acceleration: t => -Math.sin(t) * scale/2 * scaleFactors.sinusoidal.acceleration,
+            timeRange: [-2*Math.PI, 2*Math.PI]
+        },
+        projectile: {
+            name: "Projectile Motion",
+            position: t => (-0.5*t*t + 2*t) * scaleFactors.projectile.position,
+            velocity: t => (-t + 2) * scaleFactors.projectile.velocity,
+            acceleration: t => -1 * scaleFactors.projectile.acceleration,
+            timeRange: [-1, 3]
+        },
+        custom: {
+            name: "Custom Motion",
+            position: t => Math.pow(t, 3)/3 * scaleFactors.custom.position,
+            velocity: t => Math.pow(t, 2) * scaleFactors.custom.velocity,
+            acceleration: t => 2*t * scaleFactors.custom.acceleration,
+            timeRange: [-2, 2]
+        }
+    };
+
+
+    // Add scale factors for better visualization
+    const scaleFactors = {
+        uniformAcceleration: {
+            position: 50,    // Multiply position by 50
+            velocity: 100,   // Multiply velocity by 100
+            acceleration: 200 // Multiply acceleration by 200
+        },
+        sinusoidal: {
+            position: 1,
+            velocity: 1,
+            acceleration: 1
+        },
+        projectile: {
+            position: 100,
+            velocity: 150,
+            acceleration: 200
+        },
+        custom: {
+            position: 30,
+            velocity: 50,
+            acceleration: 70
+        }
+    };
+
+    let currentMotion = 'sinusoidal';
+
+    function createControls() {
+        const controlPanel = document.createElement('div');
+        controlPanel.style.position = 'absolute';
+        controlPanel.style.top = '20px';
+        controlPanel.style.right = '20px';  // Changed from left to right
+        controlPanel.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        controlPanel.style.padding = '10px';
+        controlPanel.style.borderRadius = '5px';
+        controlPanel.style.zIndex = '1000';
+
+
+        Object.entries(motionTypes).forEach(([key, motion]) => {
+            const button = document.createElement('button');
+            button.textContent = motion.name;
+            button.style.margin = '5px';
+            button.style.padding = '5px 10px';
+            button.style.backgroundColor = currentMotion === key ? '#555' : '#333';
+            button.style.color = 'white';
+            button.style.border = '1px solid white';
+            button.style.cursor = 'pointer';
+
+            button.onclick = () => {
+                currentMotion = key;
+                currentTime = motionTypes[key].timeRange[0];
+                document.querySelectorAll('button').forEach(b => 
+                    b.style.backgroundColor = '#333');
+                button.style.backgroundColor = '#555';
+            };
+
+            controlPanel.appendChild(button);
+        });
+
+        document.body.appendChild(controlPanel);
+    }
+
+    function drawGrid() {
+        ctx.strokeStyle = colors.grid;
+        ctx.lineWidth = 0.5;
+
+        for(let i = -width/2; i < width/2; i += scale/4) {
+            ctx.beginPath();
+            ctx.moveTo(i, -height/2);
+            ctx.lineTo(i, height/2);
+            ctx.stroke();
+        }
+        
+        for(let i = -height/2; i < height/2; i += scale/4) {
+            ctx.beginPath();
+            ctx.moveTo(-width/2, i);
+            ctx.lineTo(width/2, i);
+            ctx.stroke();
+        }
+    }
+
+    function drawAxes() {
+        ctx.strokeStyle = colors.axis;
+        ctx.lineWidth = 2;
+        
+        // Time axis
+        ctx.beginPath();
+        ctx.moveTo(-width/2, 0);
+        ctx.lineTo(width/2, 0);
+        ctx.stroke();
+        
+        // Value axis
+        ctx.beginPath();
+        ctx.moveTo(0, -height/2);
+        ctx.lineTo(0, height/2);
+        ctx.stroke();
+
+        // Add labels
+        ctx.save();
+        ctx.scale(1, -1);
+        ctx.font = '12px Arial';
+        ctx.fillStyle = colors.axis;
+        
+        // Time labels
+        for(let t = -10; t <= 10; t++) {
+            const x = t * scale;
+            if(x >= -width/2 && x <= width/2) {
+                ctx.fillText(t.toString(), x - 10, 20);
+            }
+        }
+        
+        // Value labels
+        for(let v = -10; v <= 10; v++) {
+            const y = v * scale;
+            if(y >= -height/2 && y <= height/2) {
+                ctx.fillText(v.toString(), 5, -y + 5);
+            }
+        }
+        ctx.restore();
+    }
+
+    // Modify value display position
+    function drawValues(t, motion) {
+        ctx.save();
+        ctx.scale(1, -1);
+        ctx.font = "16px Arial";
+        
+        // Draw value box
+        const boxPadding = 10;
+        const boxWidth = 250;
+        const boxHeight = 100;
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(-width/2 + 20, -height/2 + 20, boxWidth, boxHeight);
+        
+        // Draw values with scaling factors reversed for display
+        ctx.fillStyle = colors.position;
+        ctx.fillText(`Position: ${(motion.position(t)/scaleFactors[currentMotion].position).toFixed(2)}`, 
+            -width/2 + 20 + boxPadding, -height/2 + 45);
+        
+        ctx.fillStyle = colors.velocity;
+        ctx.fillText(`Velocity: ${(motion.velocity(t)/scaleFactors[currentMotion].velocity).toFixed(2)}`, 
+            -width/2 + 20 + boxPadding, -height/2 + 70);
+        
+        ctx.fillStyle = colors.acceleration;
+        ctx.fillText(`Acceleration: ${(motion.acceleration(t)/scaleFactors[currentMotion].acceleration).toFixed(2)}`, 
+            -width/2 + 20 + boxPadding, -height/2 + 95);
+        
+        ctx.restore();
+    }
+
+
+    function drawMotion(t) {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(-width/2, -height/2, width, height);
+        
+        drawGrid();
+        drawAxes();
+
+        const motion = motionTypes[currentMotion];
+        const timeRange = motion.timeRange;
+        const step = (timeRange[1] - timeRange[0]) / 200;
+
+        // Draw position curve
+        ctx.strokeStyle = colors.position;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for(let time = timeRange[0]; time <= timeRange[1]; time += step) {
+            const x = time * scale;
+            const y = motion.position(time);
+            if(time === timeRange[0]) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Draw velocity curve
+        ctx.strokeStyle = colors.velocity;
+        ctx.beginPath();
+        for(let time = timeRange[0]; time <= timeRange[1]; time += step) {
+            const x = time * scale;
+            const y = motion.velocity(time);
+            if(time === timeRange[0]) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Draw acceleration curve
+        ctx.strokeStyle = colors.acceleration;
+        ctx.beginPath();
+        for(let time = timeRange[0]; time <= timeRange[1]; time += step) {
+            const x = time * scale;
+            const y = motion.acceleration(time);
+            if(time === timeRange[0]) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Draw moving points
+        const x = t * scale;
+        
+        // Position point
+        ctx.fillStyle = colors.position;
+        ctx.beginPath();
+        ctx.arc(x, motion.position(t), 5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Velocity point
+        ctx.fillStyle = colors.velocity;
+        ctx.beginPath();
+        ctx.arc(x, motion.velocity(t), 5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Acceleration point
+        ctx.fillStyle = colors.acceleration;
+        ctx.beginPath();
+        ctx.arc(x, motion.acceleration(t), 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw values
+        ctx.save();
+        ctx.scale(1, -1);
+        ctx.font = "16px Arial";
+        
+        ctx.fillStyle = colors.position;
+        ctx.fillText(`Position: ${motion.position(t).toFixed(2)}`, -width/2 + 20, -height/2 + 30);
+        
+        ctx.fillStyle = colors.velocity;
+        ctx.fillText(`Velocity: ${motion.velocity(t).toFixed(2)}`, -width/2 + 20, -height/2 + 60);
+        
+        ctx.fillStyle = colors.acceleration;
+        ctx.fillText(`Acceleration: ${motion.acceleration(t).toFixed(2)}`, -width/2 + 20, -height/2 + 90);
+        
+        ctx.restore();
+
+        // Replace old value display with new drawValues function
+        drawValues(t, motionTypes[currentMotion]);
+    }
+
+    // Add legend
+    function drawLegend() {
+        ctx.save();
+        ctx.scale(1, -1);
+        
+        const legendX = width/2 - 150;
+        const legendY = -height/2 + 30;
+        const lineLength = 20;
+        const spacing = 25;
+
+        ctx.font = "14px Arial";
+        
+        // Position
+        ctx.strokeStyle = ctx.fillStyle = colors.position;
+        ctx.beginPath();
+        ctx.moveTo(legendX, legendY);
+        ctx.lineTo(legendX + lineLength, legendY);
+        ctx.stroke();
+        ctx.fillText("Position", legendX + lineLength + 5, legendY + 5);
+        
+        // Velocity
+        ctx.strokeStyle = ctx.fillStyle = colors.velocity;
+        ctx.beginPath();
+        ctx.moveTo(legendX, legendY + spacing);
+        ctx.lineTo(legendX + lineLength, legendY + spacing);
+        ctx.stroke();
+        ctx.fillText("Velocity", legendX + lineLength + 5, legendY + spacing + 5);
+        
+        // Acceleration
+        ctx.strokeStyle = ctx.fillStyle = colors.acceleration;
+        ctx.beginPath();
+        ctx.moveTo(legendX, legendY + spacing * 2);
+        ctx.lineTo(legendX + lineLength, legendY + spacing * 2);
+        ctx.stroke();
+        ctx.fillText("Acceleration", legendX + lineLength + 5, legendY + spacing * 2 + 5);
+        
+        ctx.restore();
+    }
+
+    function animate() {
+        if (isAnimating) {
+            const motion = motionTypes[currentMotion];
+            drawMotion(currentTime);
+            
+            currentTime += 0.02;
+            if (currentTime > motion.timeRange[1]) {
+                currentTime = motion.timeRange[0];
+            }
+            
+            animationId = requestAnimationFrame(animate);
+        }
+    }
+
+    document.addEventListener('keydown', event => {
+        if (event.code === 'Space') {
+            event.preventDefault();
+            isAnimating = !isAnimating;
+            if (isAnimating) animate();
+            else cancelAnimationFrame(animationId);
+        }
+    });
+
+    // Add drawLegend to main drawing function
+    const originalDrawMotion = drawMotion;
+    drawMotion = function(t) {
+        originalDrawMotion(t);
+        drawLegend();
+    };
+
+    createControls();
+    animate();
+};
+</script>
+</body>
+</html>

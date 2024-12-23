@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Calculus Visualization</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #control-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            background: #333;
+            color: white;
+            border: 1px solid white;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #444;
+        }
+        button.active {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div id="control-panel"></div>
+    <canvas id="canvas"></canvas>
+    <script>
+        window.onload = function() {
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Set actual canvas size to window size
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        width = canvas.width;
+        height = canvas.height;
+        scale = Math.min(width, height) / 8;
+        ctx.translate(width / 2, height / 2);
+        ctx.scale(1, -1);
+    }
+
+    let width, height, scale;
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    let isAnimating = true;
+    let animationId = null;
+    let currentFunction = 'sin';
+
+    const colors = {
+        function: "#ffffff",
+        derivative: "#ff0000",
+        integral: "#00ff00",
+        tangent: "#00ffff",
+        asymptote: "#ff8800",
+        discontinuity: "#ff00ff",
+        grid: "#333333",
+        axis: "#ffffff"
+    };
+
+    const functions = {
+        sin: {
+            f: x => Math.sin(x),
+            df: x => Math.cos(x),
+            name: "sin(x)",
+            domain: [-4 * Math.PI, 4 * Math.PI],
+        },
+        tan: {
+            f: x => Math.tan(x),
+            df: x => 1 / Math.pow(Math.cos(x), 2),
+            name: "tan(x)",
+            domain: [-1.5 * Math.PI, 1.5 * Math.PI],
+            hasAsymptotes: true,
+            asymptotes: [-Math.PI/2, Math.PI/2]
+        },
+        rational: {
+            f: x => x / (x * x - 1),
+            df: x => (1 - x * x) / Math.pow(x * x - 1, 2),
+            name: "x/(x²-1)",
+            domain: [-4, 4],
+            holes: [-1, 1]
+        },
+        absolute: {
+            f: x => Math.abs(x),
+            df: x => x < 0 ? -1 : 1,
+            name: "|x|",
+            domain: [-4, 4],
+            cornerPoints: [0]
+        }
+    };
+
+    function createControls() {
+        const panel = document.getElementById('control-panel');
+        Object.entries(functions).forEach(([key, func]) => {
+            const button = document.createElement('button');
+            button.textContent = func.name;
+            button.onclick = () => {
+                currentFunction = key;
+                document.querySelectorAll('button').forEach(b => 
+                    b.classList.remove('active'));
+                button.classList.add('active');
+            };
+            if (key === currentFunction) button.classList.add('active');
+            panel.appendChild(button);
+        });
+    }
+
+    function drawGrid() {
+        ctx.strokeStyle = colors.grid;
+        ctx.lineWidth = 0.5;
+
+        // Vertical grid lines
+        for(let x = -width; x <= width; x += scale/2) {
+            ctx.beginPath();
+            ctx.moveTo(x, -height);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+        }
+
+        // Horizontal grid lines
+        for(let y = -height; y <= height; y += scale/2) {
+            ctx.beginPath();
+            ctx.moveTo(-width, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+    }
+
+    function drawAxes() {
+        ctx.strokeStyle = colors.axis;
+        ctx.lineWidth = 2;
+        
+        // X axis
+        ctx.beginPath();
+        ctx.moveTo(-width, 0);
+        ctx.lineTo(width, 0);
+        ctx.stroke();
+        
+        // Y axis
+        ctx.beginPath();
+        ctx.moveTo(0, -height);
+        ctx.lineTo(0, height);
+        ctx.stroke();
+    }
+
+    function drawFunction(t) {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(-width, -height, width * 2, height * 2);
+        
+        drawGrid();
+        drawAxes();
+
+        const func = functions[currentFunction];
+        const step = (func.domain[1] - func.domain[0]) / 1000;
+        
+        // Draw main function
+        ctx.strokeStyle = colors.function;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        let started = false;
+
+        for(let x = func.domain[0]; x <= func.domain[1]; x += step) {
+            const y = func.f(x);
+            if (isFinite(y)) {
+                const screenY = y * scale;
+                if (Math.abs(screenY) > height) continue;
+                
+                if (!started) {
+                    ctx.moveTo(x * scale, screenY);
+                    started = true;
+                } else {
+                    ctx.lineTo(x * scale, screenY);
+                }
+            }
+        }
+        ctx.stroke();
+
+        // Draw derivative
+        ctx.strokeStyle = colors.derivative;
+        ctx.beginPath();
+        started = false;
+
+        for(let x = func.domain[0]; x <= func.domain[1]; x += step) {
+            const y = func.df(x);
+            if (isFinite(y)) {
+                const screenY = y * scale;
+                if (Math.abs(screenY) > height) continue;
+                
+                if (!started) {
+                    ctx.moveTo(x * scale, screenY);
+                    started = true;
+                } else {
+                    ctx.lineTo(x * scale, screenY);
+                }
+            }
+        }
+        ctx.stroke();
+
+        // Draw moving point and tangent
+        const x = t;
+        const y = func.f(x);
+        if (isFinite(y)) {
+            const deriv = func.df(x);
+            
+            // Draw tangent line
+            if (isFinite(deriv)) {
+                ctx.strokeStyle = colors.tangent;
+                const dx = scale;
+                ctx.beginPath();
+                ctx.moveTo((x - 1) * scale, (y - deriv) * scale);
+                ctx.lineTo((x + 1) * scale, (y + deriv) * scale);
+                ctx.stroke();
+            }
+
+            // Draw point
+            ctx.fillStyle = colors.function;
+            ctx.beginPath();
+            ctx.arc(x * scale, y * scale, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw special features
+        if (func.hasAsymptotes) {
+            ctx.strokeStyle = colors.asymptote;
+            ctx.setLineDash([5, 5]);
+            func.asymptotes.forEach(x => {
+                ctx.beginPath();
+                ctx.moveTo(x * scale, -height);
+                ctx.lineTo(x * scale, height);
+                ctx.stroke();
+            });
+            ctx.setLineDash([]);
+        }
+
+        // Draw values
+        ctx.save();
+        ctx.scale(1, -1);
+        ctx.font = "16px Arial";
+        ctx.fillStyle = colors.function;
+        const yVal = func.f(x);
+        const derivVal = func.df(x);
+        ctx.fillText(`${func.name} = ${isFinite(yVal) ? yVal.toFixed(2) : "undefined"}`, 
+                    -width/2 + 20, -height/2 + 30);
+        ctx.fillStyle = colors.derivative;
+        ctx.fillText(`d/dx = ${isFinite(derivVal) ? derivVal.toFixed(2) : "undefined"}`, 
+                    -width/2 + 20, -height/2 + 60);
+        ctx.restore();
+    }
+
+    let t = 0;
+    function animate() {
+        if (isAnimating) {
+            const func = functions[currentFunction];
+            drawFunction(t);
+            t += 0.02;
+            if (t > func.domain[1]) t = func.domain[0];
+            animationId = requestAnimationFrame(animate);
+        }
+    }
+
+    document.addEventListener('keydown', event => {
+        if (event.code === 'Space') {
+            event.preventDefault();
+            isAnimating = !isAnimating;
+            if (isAnimating) animate();
+            else cancelAnimationFrame(animationId);
+        }
+    });
+
+    createControls();
+    animate();
+};
+    </script>
+</body>
+</html>

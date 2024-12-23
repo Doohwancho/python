@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        canvas {
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        .controls {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .explanation {
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .key {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #eee;
+            border-radius: 4px;
+            margin: 0 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="calcCanvas" width="800" height="500"></canvas>
+        <div class="controls">
+            Press <span class="key">1</span> for Derivatives, <span class="key">2</span> for Integrals, <span class="key">3</span> for Limits
+        </div>
+        <div class="explanation" id="explanation"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('calcCanvas');
+        const ctx = canvas.getContext('2d');
+        const explanation = document.getElementById('explanation');
+
+        let currentConcept = 1;
+        
+        // Helper functions
+        function drawAxes() {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            
+            // X axis
+            ctx.beginPath();
+            ctx.moveTo(50, canvas.height/2);
+            ctx.lineTo(canvas.width-50, canvas.height/2);
+            ctx.stroke();
+            
+            // Y axis
+            ctx.beginPath();
+            ctx.moveTo(canvas.width/2, 50);
+            ctx.lineTo(canvas.width/2, canvas.height-50);
+            ctx.stroke();
+            
+            // Add labels
+            ctx.fillStyle = '#333';
+            ctx.font = '14px system-ui';
+            ctx.fillText('x', canvas.width-30, canvas.height/2-10);
+            ctx.fillText('y', canvas.width/2+10, 30);
+        }
+
+        function drawFunction(fx) {
+            ctx.beginPath();
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 2;
+            
+            for(let x = -10; x <= 10; x += 0.1) {
+                let xPixel = (x * 40) + canvas.width/2;
+                let yPixel = canvas.height/2 - (fx(x) * 40);
+                
+                if(x === -10) {
+                    ctx.moveTo(xPixel, yPixel);
+                } else {
+                    ctx.lineTo(xPixel, yPixel);
+                }
+            }
+            
+            ctx.stroke();
+        }
+
+        // Concept renderers
+        function renderDerivatives() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawAxes();
+            
+            // Draw f(x) = x²
+            const fx = x => x * x;
+            drawFunction(fx);
+            
+            // Draw tangent line at x = 1
+            const x0 = 1;
+            const y0 = fx(x0);
+            const slope = 2 * x0;
+            
+            ctx.beginPath();
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = 2;
+            
+            const x1Pixel = ((x0-1) * 40) + canvas.width/2;
+            const y1Pixel = canvas.height/2 - ((y0-slope) * 40);
+            const x2Pixel = ((x0+1) * 40) + canvas.width/2;
+            const y2Pixel = canvas.height/2 - ((y0+slope) * 40);
+            
+            ctx.moveTo(x1Pixel, y1Pixel);
+            ctx.lineTo(x2Pixel, y2Pixel);
+            ctx.stroke();
+            
+            explanation.innerHTML = `
+                <h3>Derivatives: Rate of Change</h3>
+                <p>The derivative represents the instantaneous rate of change of a function at any given point. 
+                Here we're showing f(x) = x² (blue) and its derivative at x = 1 (red tangent line).</p>
+                <p>The derivative f'(x) = 2x tells us the slope of the tangent line at any point x.</p>
+            `;
+        }
+
+        function renderIntegrals() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawAxes();
+            
+            // Draw f(x) = x
+            const fx = x => x;
+            drawFunction(fx);
+            
+            // Draw area under curve from 0 to 2
+            ctx.fillStyle = 'rgba(37, 99, 235, 0.2)';
+            ctx.beginPath();
+            ctx.moveTo(canvas.width/2, canvas.height/2);
+            
+            for(let x = 0; x <= 2; x += 0.1) {
+                let xPixel = (x * 40) + canvas.width/2;
+                let yPixel = canvas.height/2 - (fx(x) * 40);
+                ctx.lineTo(xPixel, yPixel);
+            }
+            
+            ctx.lineTo((2 * 40) + canvas.width/2, canvas.height/2);
+            ctx.closePath();
+            ctx.fill();
+            
+            explanation.innerHTML = `
+                <h3>Integrals: Area Under the Curve</h3>
+                <p>An integral represents the area under a curve between two points. 
+                Here we're showing f(x) = x and the area under the curve from x = 0 to x = 2 (shaded blue).</p>
+                <p>The integral ∫₀² x dx = 2 gives us the exact area of this region.</p>
+            `;
+        }
+
+        function renderLimits() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawAxes();
+            
+            // Draw f(x) = sin(x)/x
+            const fx = x => x === 0 ? 1 : Math.sin(x)/x;
+            drawFunction(fx);
+            
+            // Draw point at (0,1)
+            ctx.fillStyle = '#dc2626';
+            ctx.beginPath();
+            ctx.arc(canvas.width/2, canvas.height/2 - 40, 5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            explanation.innerHTML = `
+                <h3>Limits: Behavior Near a Point</h3>
+                <p>Limits describe the value a function approaches as x gets closer and closer to a specific point. 
+                Here we're showing f(x) = sin(x)/x, which is undefined at x = 0.</p>
+                <p>However, as x approaches 0 from both sides, f(x) approaches 1 (red point).</p>
+                <p>We write this as: lim<sub>x→0</sub> sin(x)/x = 1</p>
+            `;
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if(e.key === '1') {
+                currentConcept = 1;
+                renderDerivatives();
+            } else if(e.key === '2') {
+                currentConcept = 2;
+                renderIntegrals();
+            } else if(e.key === '3') {
+                currentConcept = 3;
+                renderLimits();
+            }
+        });
+
+        // Initial render
+        renderDerivatives();
+    </script>
+</body>
+</html>

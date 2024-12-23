@@ -1,0 +1,203 @@
+<!-- source
+https://codepen.io/nshillingford/pen/YveXRE -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Integral Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        body {
+            background-color: #3b3b3b;
+            padding: 0;
+            margin: 0;
+        }
+
+        svg {
+            height: 100%;
+            width: 100%;
+        }
+        
+        text {
+            font-size: 1.5em;
+            fill: #ffffff;
+        }
+        
+        .container {
+            position: relative;
+            margin: 0 auto;
+            margin-top: 6%;
+            height: 750px;
+            width: 1250px;
+        }
+        
+        .letter {
+            font-family: serif;
+            font-size: 2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <svg>
+            <g transform="translate(125, 75) scale(0.85)">
+                <line x1="150" y1="600" x2="150" y2="25" stroke="#fff" />
+                <line x1="150" y1="600" x2="1000" y2="600" stroke="#fff" />
+                
+                <line x1="250" y1="600" x2="250" y2="620" stroke="#fff" />
+                <line x1="350" y1="600" x2="350" y2="620" stroke="#fff" />
+                <line x1="450" y1="600" x2="450" y2="620" stroke="#fff" />
+                <line x1="550" y1="600" x2="550" y2="620" stroke="#fff" />
+                <line x1="650" y1="600" x2="650" y2="620" stroke="#fff" />
+                <line x1="750" y1="600" x2="750" y2="620" stroke="#fff" />
+                <line x1="850" y1="600" x2="850" y2="620" stroke="#fff" />
+                <line x1="950" y1="600" x2="950" y2="620" stroke="#fff" />
+                
+                <line x1="125" y1="500" x2="175" y2="500" stroke="#fff" />
+                <line x1="125" y1="400" x2="175" y2="400" stroke="#fff" />
+                <line x1="125" y1="300" x2="175" y2="300" stroke="#fff" />
+                <line x1="125" y1="200" x2="175" y2="200" stroke="#fff" />
+                <line x1="125" y1="100" x2="175" y2="100" stroke="#fff" />
+                
+                <text x="242" y="652">1</text>
+                <text x="342" y="652">2</text>
+                <text x="442" y="652">3</text>
+                <text x="542" y="652">4</text>
+                <text x="642" y="652">5</text>
+                <text x="742" y="652">6</text>
+                <text x="842" y="652">7</text>
+                <text x="942" y="652">8</text>
+                
+                <text x="90" y="510">5</text>
+                <text x="80" y="410">10</text>
+                <text x="80" y="310">15</text>
+                <text x="80" y="210">20</text>
+                <text x="80" y="110">25</text>
+                
+                <path id="curvePath" d="M150,600 C150,600 520,-325 1000,600" fill="none" stroke-width="2" stroke="#9D81BA" />
+                
+                <text class="letter" x="142" y="636" style="fill:#feca57;font-size:1.2em;">a</text>
+                <text class="letter" x="998" y="636" style="fill:#feca57;font-size:1.2em;">b</text>
+                <text class="letter" x="885" y="210" style="fill:#feca57">a</text>
+                <text class="letter" x="927" y="60" style="fill:#feca57">b</text>
+                <text class="letter" x="930" y="138">f (x)</text>
+                <text class="letter" x="1000" y="140" style="fill:#26de81">dx</text>
+                <text class="letter" x="290" y="645" style="fill:#26de81;font-size:1.1em;">dx</text>
+                <text id="dx" class="letter" x="285" y="675" style="fill:#26de81;font-size:1.1em;"></text>
+            </g>
+        </svg>
+    </div>
+    <script>
+        let group = document.querySelector('g');
+        let path = document.querySelector('#curvePath');
+        let label = document.querySelector('#dx');
+        
+        const values = ['1.00', '0.50', '0.25', '0.12', '0.06', '0.03', '0.01'];
+        let currentValueIndex = 0;
+        
+        let delta = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        let s = 250.5;
+        let e = 350.5;
+        let pathStr = `M${s},600 L${s},620 L${e},620 L${e},600`;
+        
+        delta.setAttributeNS(null, 'd', pathStr);
+        delta.setAttributeNS(null, 'fill', 'none');
+        delta.setAttributeNS(null, 'stroke-width', 2);
+        delta.setAttributeNS(null, 'stroke', '#26de81');
+        group.append(delta);
+
+        let limit = 0.7;
+        let start = 300;
+        let prev = start;
+        let dx = 100;
+
+        function findY(path, x) {
+            const pathLength = path.getTotalLength();
+            let start = 0;
+            let end = pathLength;
+            let target = (start + end) / 2;
+
+            x = Math.max(x, path.getPointAtLength(0).x);
+            x = Math.min(x, path.getPointAtLength(pathLength).x);
+
+            while (target >= start && target <= pathLength) {
+                let pos = path.getPointAtLength(target);
+                if (Math.abs(pos.x - x) < 0.001) {
+                    return pos.y;
+                } else if (pos.x > x) {
+                    end = target;
+                } else {
+                    start = target;
+                }
+                target = (start + end) / 2;
+            }
+        }
+
+        function createRectangle(x, height, width) {
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            rect.setAttributeNS(null, 'x1', x);
+            rect.setAttributeNS(null, 'x2', x);
+            rect.setAttributeNS(null, 'y1', 600);
+            rect.setAttributeNS(null, 'y2', height);
+            rect.setAttributeNS(null, 'stroke-width', width);
+            rect.setAttributeNS(null, 'stroke', '#80DAEB');
+            return rect;
+        }
+
+        function integrate() {
+            let currentX = 150;
+            const rectangles = [];
+            
+            while (currentX < 1000) {
+                const height = findY(path, currentX);
+                const rect = createRectangle(currentX, height, dx);
+                rectangles.push(rect);
+                group.appendChild(rect);
+                currentX += dx + 0.1;
+            }
+
+            // Animate all rectangles
+            rectangles.forEach((rect, index) => {
+                gsap.from(rect, {
+                    duration: 0.8,
+                    attr: { y2: 600 },
+                    delay: index * 0.05,
+                    ease: "sine.out"
+                });
+            });
+
+            // Update dx label
+            label.textContent = values[currentValueIndex];
+            currentValueIndex++;
+
+            // Update delta width indicator
+            gsap.to(delta, {
+                duration: 0.8,
+                attr: { d: pathStr },
+                ease: "sine.out"
+            });
+
+            if (dx > limit) {
+                setTimeout(() => {
+                    // Remove previous rectangles
+                    rectangles.forEach(rect => rect.remove());
+                    
+                    // Update dimensions for next iteration
+                    dx = dx / 2;
+                    s += dx / 2;
+                    e -= dx / 2;
+                    pathStr = `M${s},600 L${s},620 L${e},620 L${e},600`;
+                    
+                    // Start next iteration
+                    integrate();
+                }, 2900);
+            }
+        }
+
+        // Start the visualization
+        integrate();
+    </script>
+</body>
+</html>

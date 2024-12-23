@@ -1,0 +1,46 @@
+window.onload = function() {
+	var canvas = document.getElementById("canvas"),
+		context = canvas.getContext("2d"),
+		width = canvas.width = window.innerWidth,
+		height = canvas.height = window.innerHeight,
+		p = particle.create(width / 2, height / 2, 5, Math.random() * Math.PI * 2, 0.1);
+
+	p.radius = 40;
+	p.bounce = -0.9; //bounce할 때, 속도를 기존 속도의 90%로 줄여준다. 
+
+	update();
+
+	function update() {
+		context.clearRect(0, 0, width, height);
+
+		p.update();
+
+		context.beginPath();
+		context.arc(p.position.getX(), p.position.getY(), p.radius, 0, Math.PI * 2, false);
+		context.fill();
+
+		//충돌판정
+		if(p.position.getX() + p.radius > width) {
+			p.position.setX(width - p.radius);
+			//충돌시, 반대 방향으로 원래 힘의 90%를 반사시킨다.
+			p.velocity.setX(p.velocity.getX() * p.bounce);
+		}
+		if(p.position.getX() - p.radius < 0) {
+			p.position.setX(p.radius);
+			//충돌시, 반대 방향으로 원래 힘의 90%를 반사시킨다.
+			p.velocity.setX(p.velocity.getX() * p.bounce);
+		}
+		if(p.position.getY() + p.radius > height) {
+			p.position.setY(height - p.radius);
+			//충돌시, 반대 방향으로 원래 힘의 90%를 반사시킨다.
+			p.velocity.setY(p.velocity.getY() * p.bounce);
+		}
+		if(p.position.getY() - p.radius < 0) {
+			p.position.setY(p.radius);
+			//충돌시, 반대 방향으로 원래 힘의 90%를 반사시킨다.
+			p.velocity.setY(p.velocity.getY() * p.bounce);
+		}
+
+		requestAnimationFrame(update);
+	}
+};

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { 
+            margin: 0; 
+            background: black; 
+            color: white; 
+            font-family: monospace;
+            overflow: hidden;
+        }
+        canvas { 
+            display: block; 
+        }
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        #explanation {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .slider {
+            width: 200px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="controls">
+        <div>Correlation XY: <span id="corrValue">0.7</span></div>
+        <input type="range" min="-100" max="100" value="70" class="slider" 
+               oninput="updateCorrelation(this.value/100)">
+        <div>Variance X: <span id="varXValue">1.0</span></div>
+        <input type="range" min="50" max="200" value="100" class="slider" 
+               oninput="updateVarX(this.value/100)">
+        <div>Variance Y: <span id="varYValue">1.0</span></div>
+        <input type="range" min="50" max="200" value="100" class="slider" 
+               oninput="updateVarY(this.value/100)">
+    </div>
+    <div id="explanation"></div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const explanationDiv = document.getElementById('explanation');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let correlation = 0.7;
+        let varX = 1.0;
+        let varY = 1.0;
+        let points = [];
+        let matrixValues = [];
+        let time = 0;
+        
+        function generatePoints() {
+            points = [];
+            const n = 100;
+            
+            for(let i = 0; i < n; i++) {
+                const x = normalRandom() * Math.sqrt(varX);
+                const y = correlation * x + Math.sqrt(1 - correlation * correlation) * normalRandom() * Math.sqrt(varY);
+                points.push([x, y]);
+            }
+
+            updateCovarianceMatrix();
+        }
+
+        function normalRandom() {
+            let u = 0, v = 0;
+            while(u === 0) u = Math.random();
+            while(v === 0) v = Math.random();
+            return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        }
+
+        function updateCorrelation(value) {
+            correlation = value;
+            document.getElementById('corrValue').textContent = value.toFixed(2);
+            generatePoints();
+        }
+
+        function updateVarX(value) {
+            varX = value;
+            document.getElementById('varXValue').textContent = value.toFixed(2);
+            generatePoints();
+        }
+
+        function updateVarY(value) {
+            varY = value;
+            document.getElementById('varYValue').textContent = value.toFixed(2);
+            generatePoints();
+        }
+
+        function updateCovarianceMatrix() {
+            // Calculate means
+            const meanX = points.reduce((sum, p) => sum + p[0], 0) / points.length;
+            const meanY = points.reduce((sum, p) => sum + p[1], 0) / points.length;
+
+            // Calculate covariances
+            let covXX = 0, covXY = 0, covYY = 0;
+            points.forEach(p => {
+                const dx = p[0] - meanX;
+                const dy = p[1] - meanY;
+                covXX += dx * dx;
+                covXY += dx * dy;
+                covYY += dy * dy;
+            });
+
+            const n = points.length;
+            matrixValues = [
+                [covXX/n, covXY/n],
+                [covXY/n, covYY/n]
+            ];
+        }
+
+        function toScreen(x, y, centerX, centerY, scale = 100) {
+            return {
+                x: centerX + x * scale,
+                y: centerY - y * scale
+            };
+        }
+
+        function drawScatterPlot(centerX, centerY, width, height) {
+            // Draw axes
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 1;
+            
+            // Grid
+            for(let i = -3; i <= 3; i++) {
+                const pos = toScreen(i, 0, centerX, centerY);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, centerY - height/2);
+                ctx.lineTo(pos.x, centerY + height/2);
+                ctx.stroke();
+
+                const pos2 = toScreen(0, i, centerX, centerY);
+                ctx.beginPath();
+                ctx.moveTo(centerX - width/2, pos2.y);
+                ctx.lineTo(centerX + width/2, pos2.y);
+                ctx.stroke();
+            }
+
+            // Points
+            ctx.fillStyle = '#4488ff';
+            points.forEach(p => {
+                const screen = toScreen(p[0], p[1], centerX, centerY);
+                ctx.beginPath();
+                ctx.arc(screen.x, screen.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function drawCovarianceMatrix(x, y, size) {
+            const cellSize = size/2;
+            
+            // Draw matrix cells
+            for(let i = 0; i < 2; i++) {
+                for(let j = 0; j < 2; j++) {
+                    const value = matrixValues[i][j];
+                    const normalizedValue = Math.min(Math.abs(value), 2) / 2;
+                    
+                    // Cell background
+                    ctx.fillStyle = value >= 0 ? 
+                        `rgba(0, 255, 0, ${normalizedValue})` :
+                        `rgba(255, 0, 0, ${normalizedValue})`;
+                    
+                    ctx.fillRect(
+                        x + j * cellSize,
+                        y + i * cellSize,
+                        cellSize,
+                        cellSize
+                    );
+
+                    // Cell value
+                    ctx.fillStyle = 'white';
+                    ctx.font = '16px monospace';
+                    ctx.fillText(
+                        value.toFixed(2),
+                        x + j * cellSize + cellSize/4,
+                        y + i * cellSize + cellSize/2
+                    );
+                }
+            }
+
+            // Draw matrix brackets
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            
+            // Left bracket
+            ctx.beginPath();
+            ctx.moveTo(x - 10, y - 5);
+            ctx.lineTo(x - 20, y - 5);
+            ctx.lineTo(x - 20, y + size + 5);
+            ctx.lineTo(x - 10, y + size + 5);
+            ctx.stroke();
+
+            // Right bracket
+            ctx.beginPath();
+            ctx.moveTo(x + size + 10, y - 5);
+            ctx.lineTo(x + size + 20, y - 5);
+            ctx.lineTo(x + size + 20, y + size + 5);
+            ctx.lineTo(x + size + 10, y + size + 5);
+            ctx.stroke();
+        }
+
+        function drawConnectingLines() {
+            const scatterCenterX = canvas.width/2 - 200;
+            const scatterCenterY = canvas.height/2;
+            const matrixX = canvas.width/2 + 200;
+            const matrixY = canvas.height/2 - 100;
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.setLineDash([5, 5]);
+
+            // Connect variance X
+            ctx.beginPath();
+            ctx.moveTo(scatterCenterX + 100, scatterCenterY);
+            ctx.lineTo(matrixX, matrixY);
+            ctx.stroke();
+
+            // Connect covariance
+            ctx.beginPath();
+            ctx.moveTo(scatterCenterX + 50, scatterCenterY - 50);
+            ctx.lineTo(matrixX + 100, matrixY + 100);
+            ctx.stroke();
+
+            // Connect variance Y
+            ctx.beginPath();
+            ctx.moveTo(scatterCenterX, scatterCenterY - 100);
+            ctx.lineTo(matrixX + 200, matrixY + 200);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw scatter plot
+            drawScatterPlot(canvas.width/2 - 200, canvas.height/2, 400, 400);
+
+            // Draw covariance matrix
+            drawCovarianceMatrix(canvas.width/2 + 100, canvas.height/2 - 100, 200);
+
+            // Draw connecting lines
+            drawConnectingLines();
+
+            // Update explanation
+            explanationDiv.innerHTML = `
+                <h2>Covariance Matrix</h2>
+                <p>The covariance matrix shows how variables vary together:</p>
+                <ul>
+                    <li>Diagonal: Variances (σ²)</li>
+                    <li>Off-diagonal: Covariances</li>
+                </ul>
+                <p>Matrix values:</p>
+                <ul>
+                    <li>Var(X) = ${matrixValues[0][0].toFixed(2)}</li>
+                    <li>Cov(X,Y) = ${matrixValues[0][1].toFixed(2)}</li>
+                    <li>Var(Y) = ${matrixValues[1][1].toFixed(2)}</li>
+                </ul>
+                <p>Green = positive correlation<br>
+                   Red = negative correlation</p>
+            `;
+        }
+
+        function animate() {
+            time += 0.02;
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        generatePoints();
+        animate();
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>

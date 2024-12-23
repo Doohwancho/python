@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            background: black;
+            color: white;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        canvas { display: block; }
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 350px;
+        }
+        #matrices {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        #transition-slider {
+            width: 300px;
+            margin: 10px;
+        }
+        button {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        button:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="info">
+        Click and drag yellow vector<br><br>
+        Standard Basis (Red):<br>
+        • î = [1, 0], ĵ = [0, 1]<br><br>
+        New Basis (Green):<br>
+        • b₁ = [2, 1], b₂ = [-1, 1]<br><br>
+    </div>
+    <div id="matrices">Same vector, different coordinates!</div>
+    <div id="controls">
+        <input type="range" id="transition-slider" min="0" max="100" value="0">
+        <br>
+        <button id="animate-btn">Animate Transition</button>
+        <button id="reset-btn">Reset</button>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const matricesDiv = document.getElementById('matrices');
+        const slider = document.getElementById('transition-slider');
+        const animateBtn = document.getElementById('animate-btn');
+        const resetBtn = document.getElementById('reset-btn');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let isDragging = false;
+        let isAnimating = false;
+        let currentVector = {x: 1, y: 1};
+        let transitionProgress = 0;
+
+        const standardBasis = {
+            i: {x: 1, y: 0},
+            j: {x: 0, y: 1}
+        };
+
+        const newBasis = {
+            b1: {x: 2, y: 1},
+            b2: {x: -1, y: 1}
+        };
+
+        function lerp(start, end, t) {
+            return {
+                x: start.x + (end.x - start.x) * t,
+                y: start.y + (end.y - start.y) * t
+            };
+        }
+
+        function getCurrentBasis(t) {
+            return {
+                b1: lerp(standardBasis.i, newBasis.b1, t),
+                b2: lerp(standardBasis.j, newBasis.b2, t)
+            };
+        }
+
+        function toScreen(x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 8;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2 - y * scale
+            };
+        }
+
+        function fromScreen(x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 8;
+            return {
+                x: (x - canvas.width/2) / scale,
+                y: -(y - canvas.height/2) / scale
+            };
+        }
+
+        function getInverseMatrix(a11, a12, a21, a22) {
+            const det = a11 * a22 - a12 * a21;
+            return {
+                a11: a22/det,
+                a12: -a12/det,
+                a21: -a21/det,
+                a22: a11/det
+            };
+        }
+
+        function getVectorInBasis(vec, basis) {
+            const inv = getInverseMatrix(
+                basis.b1.x, basis.b2.x,
+                basis.b1.y, basis.b2.y
+            );
+            return {
+                x: inv.a11 * vec.x + inv.a12 * vec.y,
+                y: inv.a21 * vec.x + inv.a22 * vec.y
+            };
+        }
+
+        function updateMatrices() {
+            const currentBasis = getCurrentBasis(transitionProgress);
+            const newCoords = getVectorInBasis(currentVector, currentBasis);
+            matricesDiv.innerHTML = `
+                Standard Coordinates:<br>
+                [${currentVector.x.toFixed(2)}]<br>
+                [${currentVector.y.toFixed(2)}]<br><br>
+                Current Basis Coordinates:<br>
+                [${newCoords.x.toFixed(2)}]<br>
+                [${newCoords.y.toFixed(2)}]
+            `;
+        }
+
+        function drawGrid(transformMatrix = null) {
+            const gridSize = 5;
+            const step = 1;
+            
+            ctx.lineWidth = 1;
+            
+            for(let i = -gridSize; i <= gridSize; i += step) {
+                if (!transformMatrix) {
+                    // Standard grid
+                    ctx.strokeStyle = '#333';
+                    
+                    // Vertical lines
+                    let start = toScreen(i, -gridSize);
+                    let end = toScreen(i, gridSize);
+                    ctx.beginPath();
+                    ctx.moveTo(start.x, start.y);
+                    ctx.lineTo(end.x, end.y);
+                    ctx.stroke();
+
+                    // Horizontal lines
+                    start = toScreen(-gridSize, i);
+                    end = toScreen(gridSize, i);
+                    ctx.beginPath();
+                    ctx.moveTo(start.x, start.y);
+                    ctx.lineTo(end.x, end.y);
+                    ctx.stroke();
+                } else {
+                    // Transformed grid
+                    ctx.strokeStyle = '#1a3333';
+                    
+                    for(let j = -gridSize; j <= gridSize; j += step) {
+                        // Vertical lines
+                        const x1 = i * transformMatrix.b1.x + j * transformMatrix.b2.x;
+                        const y1 = i * transformMatrix.b1.y + j * transformMatrix.b2.y;
+                        const x2 = (i+step) * transformMatrix.b1.x + j * transformMatrix.b2.x;
+                        const y2 = (i+step) * transformMatrix.b1.y + j * transformMatrix.b2.y;
+                        
+                        let start = toScreen(x1, y1);
+                        let end = toScreen(x2, y2);
+                        ctx.beginPath();
+                        ctx.moveTo(start.x, start.y);
+                        ctx.lineTo(end.x, end.y);
+                        ctx.stroke();
+
+                        // Horizontal lines
+                        const x3 = j * transformMatrix.b1.x + i * transformMatrix.b2.x;
+                        const y3 = j * transformMatrix.b1.y + i * transformMatrix.b2.y;
+                        const x4 = j * transformMatrix.b1.x + (i+step) * transformMatrix.b2.x;
+                        const y4 = j * transformMatrix.b1.y + (i+step) * transformMatrix.b2.y;
+                        
+                        start = toScreen(x3, y3);
+                        end = toScreen(x4, y4);
+                        ctx.beginPath();
+                        ctx.moveTo(start.x, start.y);
+                        ctx.lineTo(end.x, end.y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        function drawVector(vec, color = '#ffff00', width = 2, label = '', start = {x: 0, y: 0}) {
+            const startPoint = toScreen(start.x, start.y);
+            const endPoint = toScreen(start.x + vec.x, start.y + vec.y);
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(startPoint.x, startPoint.y);
+            ctx.lineTo(endPoint.x, endPoint.y);
+            ctx.stroke();
+
+            // Arrow head
+            const angle = Math.atan2(endPoint.y - startPoint.y, endPoint.x - startPoint.x);
+            ctx.beginPath();
+            ctx.moveTo(endPoint.x, endPoint.y);
+            ctx.lineTo(
+                endPoint.x - 15 * Math.cos(angle - Math.PI/6),
+                endPoint.y - 15 * Math.sin(angle - Math.PI/6)
+            );
+            ctx.lineTo(
+                endPoint.x - 15 * Math.cos(angle + Math.PI/6),
+                endPoint.y - 15 * Math.sin(angle + Math.PI/6)
+            );
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            if(label) {
+                ctx.fillStyle = color;
+                ctx.font = '16px monospace';
+                ctx.fillText(label, endPoint.x + 10, endPoint.y);
+            }
+        }
+
+        function drawVectorComponents() {
+            const currentBasis = getCurrentBasis(transitionProgress);
+            const newCoords = getVectorInBasis(currentVector, currentBasis);
+            
+            // Components in current basis
+            const comp1 = {
+                x: currentBasis.b1.x * newCoords.x,
+                y: currentBasis.b1.y * newCoords.x
+            };
+            const comp2 = {
+                x: currentBasis.b2.x * newCoords.y,
+                y: currentBasis.b2.y * newCoords.y
+            };
+
+            ctx.setLineDash([5, 5]);
+            drawVector(comp1, '#44ff44', 1);
+            drawVector(comp2, '#44ff44', 1, '', comp1);
+            ctx.setLineDash([]);
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const currentBasis = getCurrentBasis(transitionProgress);
+            
+            drawGrid();
+            drawGrid(currentBasis);
+
+            // Interpolate colors
+            const t = transitionProgress;
+            const redColor = `rgb(255,${68 + 187*t},${68 + 187*t})`;
+            const greenColor = `rgb(${68 + 187*(1-t)},255,${68 + 187*(1-t)})`;
+
+            // Draw basis vectors with interpolated colors
+            drawVector(currentBasis.b1, greenColor, 2, 'b₁');
+            drawVector(currentBasis.b2, greenColor, 2, 'b₂');
+
+            // Draw current vector and its components
+            drawVector(currentVector, '#ffff00', 3, 'v');
+            drawVectorComponents();
+            updateMatrices();
+        }
+
+        slider.addEventListener('input', (e) => {
+            transitionProgress = e.target.value / 100;
+            draw();
+        });
+
+        animateBtn.addEventListener('click', () => {
+            if (!isAnimating) {
+                isAnimating = true;
+                animateBtn.textContent = 'Stop Animation';
+                function animate() {
+                    if (isAnimating) {
+                        transitionProgress += 0.01;
+                        if (transitionProgress > 1) {
+                            transitionProgress = 0;
+                        }
+                        slider.value = transitionProgress * 100;
+                        draw();
+                        requestAnimationFrame(animate);
+                    }
+                }
+                animate();
+            } else {
+                isAnimating = false;
+                animateBtn.textContent = 'Animate Transition';
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            transitionProgress = 0;
+            slider.value = 0;
+            isAnimating = false;
+            animateBtn.textContent = 'Animate Transition';
+            draw();
+        });
+
+        canvas.addEventListener('mousedown', e => {
+            isDragging = true;
+            currentVector = fromScreen(e.clientX, e.clientY);
+            draw();
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if(isDragging) {
+                currentVector = fromScreen(e.clientX, e.clientY);
+                draw();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        });
+
+        draw();
+    </script>
+</body>
+</html>

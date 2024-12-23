@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>JS Bin</title>
+</head>
+<body>
+  <canvas id="canvas" width="600" height="600"></canvas>
+  <script>
+    var canvas = document.getElementById("canvas"),
+    context = canvas.getContext("2d");
+
+    var maxDist = 100;
+    var nodes = [];
+
+    for(var i = 0; i < 100; i++) {
+      nodes.push({
+        x: Math.random() * 600,
+        y: Math.random() * 600,
+        vx: Math.random() * 2 - 1,
+        vy: Math.random() * 2 - 1
+      });
+    }
+
+    update();
+
+    function update() {
+      context.clearRect(0, 0, 600, 600);
+      for(var i = 0; i < 100; i++) {
+        var node = nodes[i];
+        node.x += node.vx;
+        node.y += node.vy;
+        if(node.x > 600) { //충돌판정: 벽에 부딪히면 반대방향으로 이동
+          node.x = 0;
+        }
+        else if(node.x < 0) { //충돌판정: 벽에 부딪히면 반대방향으로 이동
+          node.x = 600;
+        }
+        if(node.y > 600) { //충돌판정: 벽에 부딪히면 반대방향으로 이동
+          node.y = 0;
+        }
+        else if(node.y < 0) { //충돌판정: 벽에 부딪히면 반대방향으로 이동
+          node.y = 600;
+        }
+        context.beginPath();
+        context.arc(node.x, node.y, 2, 0, Math.PI * 2);
+        context.fill();
+      }
+
+      for(var i = 0; i < nodes.length - 1; i++) {
+        var nodeA = nodes[i];
+        for(var j = i + 1; j < nodes.length; j++) {
+          var nodeB = nodes[j];
+          
+          //두 노드의 사이거리를 계산 
+          var dx = nodeB.x - nodeA.x,
+              dy = nodeB.y - nodeA.y,
+              dist = Math.sqrt(dx * dx + dy * dy);
+
+          //두 노드의 사이거리가 최대거리보다 작으면 선을 그린다.
+          if(dist < maxDist) {
+            context.lineWidth = 1 - dist / maxDist;
+            context.beginPath();
+            context.moveTo(nodeA.x, nodeA.y);
+            context.lineTo(nodeB.x, nodeB.y);
+            context.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(update);
+    }
+</script>
+</body>
+</html>

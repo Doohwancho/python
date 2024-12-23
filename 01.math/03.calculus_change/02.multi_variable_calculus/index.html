@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Calculus Visualization</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #control-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            background: #333;
+            color: white;
+            border: 1px solid white;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #444;
+        }
+        button.active {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div id="control-panel"></div>
+    <canvas id="canvas"></canvas>
+    <script>
+window.onload = function() {
+    const canvas = document.getElementById("canvas"),
+        context = canvas.getContext("2d"),
+        width = canvas.width = window.innerWidth,
+        height = canvas.height = window.innerHeight;
+
+    let rotationX = Math.PI/4;
+    let rotationY = -Math.PI/4;
+    let isDragging = false;
+    let lastMouseX, lastMouseY;
+    let currentExample = "line"; // line, disk, cube
+    let isAnimating = true;
+    let currentTime = 0;
+
+    const colors = {
+        boundary: "#ff0000",    // Red for boundary
+        interior: "#00ff00",    // Green for interior
+        flow: "#0088ff",        // Blue for vector field/flow
+        xAxis: "#ff6666",       // Light red for x-axis
+        yAxis: "#66ff66",       // Light green for y-axis
+        zAxis: "#6666ff",       // Light blue for z-axis
+        text: "#ffffff"         // White for text
+    };
+
+    // 3D projection function
+    function project(x, y, z) {
+        const cos1 = Math.cos(rotationY);
+        const sin1 = Math.sin(rotationY);
+        const cos2 = Math.cos(rotationX);
+        const sin2 = Math.sin(rotationX);
+
+        const x1 = x * cos1 + z * sin1;
+        const y1 = y;
+        const z1 = -x * sin1 + z * cos1;
+
+        const x2 = x1;
+        const y2 = y1 * cos2 - z1 * sin2;
+        const z2 = y1 * sin2 + z1 * cos2;
+
+        const scale = 100;
+        const perspective = 1000;
+        const factor = perspective / (perspective + z2);
+
+        return {
+            x: width/2 + x2 * scale * factor,
+            y: height/2 + y2 * scale * factor,
+            z: z2
+        };
+    }
+
+    function drawAxes() {
+        const origin = project(0, 0, 0);
+        const size = 3;
+
+        // X-axis (red)
+        const xEnd = project(size, 0, 0);
+        context.beginPath();
+        context.strokeStyle = colors.xAxis;
+        context.lineWidth = 2;
+        context.moveTo(origin.x, origin.y);
+        context.lineTo(xEnd.x, xEnd.y);
+        context.stroke();
+        context.fillStyle = colors.xAxis;
+        context.fillText("x", xEnd.x + 10, xEnd.y);
+
+        // Y-axis (green)
+        const yEnd = project(0, size, 0);
+        context.beginPath();
+        context.strokeStyle = colors.yAxis;
+        context.moveTo(origin.x, origin.y);
+        context.lineTo(yEnd.x, yEnd.y);
+        context.stroke();
+        context.fillStyle = colors.yAxis;
+        context.fillText("y", yEnd.x + 10, yEnd.y);
+
+        // Z-axis (blue)
+        const zEnd = project(0, 0, size);
+        context.beginPath();
+        context.strokeStyle = colors.zAxis;
+        context.moveTo(origin.x, origin.y);
+        context.lineTo(zEnd.x, zEnd.y);
+        context.stroke();
+        context.fillStyle = colors.zAxis;
+        context.fillText("z", zEnd.x + 10, zEnd.y);
+    }
+
+    // function drawLineExample() {
+    //     // Draw line segment (1D manifold)
+    //     const a = -1.5;
+    //     const b = 1.5;
+    //     const p1 = project(a, 0, 0);
+    //     const p2 = project(b, 0, 0);
+
+    //     // Draw interior (the line)
+    //     context.beginPath();
+    //     context.strokeStyle = colors.interior;
+    //     context.lineWidth = 3;
+    //     context.moveTo(p1.x, p1.y);
+    //     context.lineTo(p2.x, p2.y);
+    //     context.stroke();
+
+    //     // Draw boundary points
+    //     context.beginPath();
+    //     context.fillStyle = colors.boundary;
+    //     context.arc(p1.x, p1.y, 5, 0, Math.PI * 2);
+    //     context.arc(p2.x, p2.y, 5, 0, Math.PI * 2);
+    //     context.fill();
+
+    //     drawExplanation([
+    //         "showing how the boundary integral relates to the interior integral.",
+    //         "Fundamental Theorem of Calculus",
+    //         "∫[a,b] df = f(b) - f(a)",
+    //         "",
+    //         "• Line: 1D manifold (ω)",
+    //         "• Points: 0D boundary (∂ω)",
+    //         "• Demonstrates basic integration"
+    //     ]);
+    // }
+
+    function drawLineExample() {
+        // Draw curved path (1D manifold)
+        const a = -1.5;
+        const b = 1.5;
+        const segments = 50;
+        
+        context.beginPath();
+        context.strokeStyle = colors.interior;
+        context.lineWidth = 3;
+    
+        // Draw curve y = x^2
+        for(let i = 0; i <= segments; i++) {
+            const t = i / segments;
+            const x = a + (b - a) * t;
+            const y = x * x;  // quadratic function
+            const p = project(x, y, 0);
+            
+            if(i === 0) context.moveTo(p.x, p.y);
+            else context.lineTo(p.x, p.y);
+        }
+        context.stroke();
+    
+        // Draw boundary points
+        const p1 = project(a, a * a, 0);  // Point at x = a
+        const p2 = project(b, b * b, 0);  // Point at x = b
+        
+        context.beginPath();
+        context.fillStyle = colors.boundary;
+        context.arc(p1.x, p1.y, 5, 0, Math.PI * 2);
+        context.arc(p2.x, p2.y, 5, 0, Math.PI * 2);
+        context.fill();
+    
+        // Optional: Draw some tangent vectors to show derivative
+        const numVectors = 5;
+        context.strokeStyle = colors.flow;
+        for(let i = 0; i < numVectors; i++) {
+            const x = a + (b - a) * (i / (numVectors - 1));
+            const y = x * x;
+            const derivative = 2 * x;  // derivative of x^2
+            
+            const p = project(x, y, 0);
+            const tangent = project(x + 0.2, y + 0.2 * derivative, 0);
+            
+            context.beginPath();
+            context.moveTo(p.x, p.y);
+            context.lineTo(tangent.x, tangent.y);
+            context.stroke();
+        }
+    
+        drawExplanation([
+            "showing how the boundary integral relates to the interior integral.",
+            "Fundamental Theorem of Calculus",
+            "∫[a,b] f'(x)dx = f(b) - f(a)",
+            "",
+            "• Curve: y = x² (1D manifold)",
+            "• Points: endpoints (∂ω)",
+            "• Arrows show derivative f'(x) = 2x"
+        ]);
+    }
+
+    function drawDiskExample() {
+        // Draw disk (2D manifold)
+        const radius = 1.5;
+        const segments = 50;
+        
+        // Draw interior
+        context.beginPath();
+        for(let i = 0; i <= segments; i++) {
+            const theta = (i / segments) * Math.PI * 2;
+            const r = radius * Math.sin(currentTime + i/10); // Animated radius
+            const x = r * Math.cos(theta);
+            const y = r * Math.sin(theta);
+            const p = project(x, y, 0);
+            
+            if(i === 0) context.moveTo(p.x, p.y);
+            else context.lineTo(p.x, p.y);
+        }
+        context.fillStyle = colors.interior + '40';
+        context.fill();
+
+        // Draw boundary circle
+        context.beginPath();
+        for(let i = 0; i <= segments; i++) {
+            const theta = (i / segments) * Math.PI * 2;
+            const x = radius * Math.cos(theta);
+            const y = radius * Math.sin(theta);
+            const p = project(x, y, 0);
+            
+            if(i === 0) context.moveTo(p.x, p.y);
+            else context.lineTo(p.x, p.y);
+        }
+        context.strokeStyle = colors.boundary;
+        context.lineWidth = 3;
+        context.stroke();
+
+        drawExplanation([
+            "showing how the boundary integral relates to the interior integral.",
+            "Green's Theorem",
+            "∫∫_D (∂Q/∂x - ∂P/∂y) dxdy = ∮_C (Pdx + Qdy)",
+            "",
+            "• Disk: 2D manifold (ω)",
+            "• Circle: 1D boundary (∂ω)",
+            "• Relates double integral to line integral"
+        ]);
+    }
+
+    function drawCubeExample() {
+        // Draw cube (3D manifold)
+        const size = 1.5;
+        const vertices = [
+            [-size, -size, -size], [size, -size, -size],
+            [size, size, -size], [-size, size, -size],
+            [-size, -size, size], [size, -size, size],
+            [size, size, size], [-size, size, size]
+        ];
+
+        const edges = [
+            [0,1], [1,2], [2,3], [3,0],
+            [4,5], [5,6], [6,7], [7,4],
+            [0,4], [1,5], [2,6], [3,7]
+        ];
+
+        // Project vertices
+        const projectedVertices = vertices.map(v => project(v[0], v[1], v[2]));
+
+        // Draw faces (interior)
+        const faces = [
+            [0,1,2,3], [4,5,6,7], // front, back
+            [0,1,5,4], [2,3,7,6], // top, bottom
+            [0,3,7,4], [1,2,6,5]  // left, right
+        ];
+
+        faces.forEach(face => {
+            context.beginPath();
+            face.forEach((vIndex, i) => {
+                const v = projectedVertices[vIndex];
+                if(i === 0) context.moveTo(v.x, v.y);
+                else context.lineTo(v.x, v.y);
+            });
+            context.closePath();
+            context.fillStyle = colors.interior + '20';
+            context.fill();
+        });
+
+        // Draw edges (boundary)
+        edges.forEach(edge => {
+            const v1 = projectedVertices[edge[0]];
+            const v2 = projectedVertices[edge[1]];
+            
+            context.beginPath();
+            context.strokeStyle = colors.boundary;
+            context.lineWidth = 2;
+            context.moveTo(v1.x, v1.y);
+            context.lineTo(v2.x, v2.y);
+            context.stroke();
+        });
+
+        drawExplanation([
+            "showing how the boundary integral relates to the interior integral.",
+            "Divergence Theorem",
+            "∫∫∫_V ∇·F dV = ∫∫_S F·n dS",
+            "",
+            "• Cube: 3D manifold (ω)",
+            "• Faces: 2D boundary (∂ω)",
+            "• Relates triple integral to surface integral"
+        ]);
+    }
+
+    function drawExplanation(lines) {
+        // Draw explanation box
+        context.fillStyle = "rgba(0, 0, 0, 0.8)";
+        context.fillRect(20, 20, 400, 200);
+
+        context.fillStyle = colors.text;
+        context.font = "18px Arial";
+        let y = 50;
+        lines.forEach(line => {
+            context.fillText(line, 40, y);
+            y += 25;
+        });
+
+        // Draw controls
+        y = height - 150;
+        context.fillStyle = "rgba(0, 0, 0, 0.8)";
+        context.fillRect(20, y, 300, 130);
+
+        context.fillStyle = colors.text;
+        [
+            "Controls:",
+            "1: Line integral (1D)",
+            "2: Green's theorem (2D)",
+            "3: Divergence theorem (3D)",
+            "Drag to rotate"
+        ].forEach(line => {
+            context.fillText(line, 40, y += 25);
+        });
+    }
+
+    function draw() {
+        context.fillStyle = 'black';
+        context.fillRect(0, 0, width, height);
+
+        drawAxes();
+
+        switch(currentExample) {
+            case "line":
+                drawLineExample();
+                break;
+            case "disk":
+                drawDiskExample();
+                break;
+            case "cube":
+                drawCubeExample();
+                break;
+        }
+    }
+
+    function animate() {
+        if(isAnimating) {
+            currentTime += 0.02;
+            draw();
+            requestAnimationFrame(animate);
+        }
+    }
+
+    // Event handlers
+    canvas.addEventListener('mousedown', e => {
+        isDragging = true;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+    });
+
+    canvas.addEventListener('mousemove', e => {
+        if(isDragging) {
+            const deltaX = e.clientX - lastMouseX;
+            const deltaY = e.clientY - lastMouseY;
+            rotationY += deltaX * 0.01;
+            rotationX += deltaY * 0.01;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            draw();
+        }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+
+    document.addEventListener('keydown', e => {
+        switch(e.key) {
+            case '1':
+                currentExample = "line";
+                break;
+            case '2':
+                currentExample = "disk";
+                break;
+            case '3':
+                currentExample = "cube";
+                break;
+            case ' ':
+                isAnimating = !isAnimating;
+                if(isAnimating) animate();
+                break;
+        }
+        draw();
+    });
+
+    animate();
+};
+    </script>
+</body>
+</html>

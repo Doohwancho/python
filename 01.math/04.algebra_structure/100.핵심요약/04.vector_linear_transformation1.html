@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Linear Transformation Types</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: black;
+            color: white;
+            font-family: monospace;
+        }
+        canvas {
+            width: 100%;
+            height: 100vh;
+            background: black;
+        }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            z-index: 1000;
+        }
+        #matrix-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        input[type="range"] {
+            width: 200px;
+            margin: 10px;
+        }
+        .transform-type {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="info">
+        Linear Transformations:<br><br>
+        • Green: î basis vector<br>
+        • Red: ĵ basis vector<br>
+        • Blue: Grid shows transformation<br><br>
+        Matrix [a b; c d] shows how<br>
+        basis vectors transform
+    </div>
+    <div id="matrix-info">Matrix & Basis Vectors</div>
+    <div id="controls">
+        <div class="transform-type">
+            <button id="rotate-btn" class="active">Rotation</button>
+            <button id="scale-btn">Scaling</button>
+            <button id="shear-btn">Shear</button>
+            <button id="reflect-btn">Reflection</button>
+            <button id="project-x-btn">Project X</button>
+            <button id="project-vec-btn">Project [1,2]</button>
+            <button id="permute-btn">Permute</button>
+        </div>
+        <div>
+            <input type="range" id="transform-slider" min="0" max="100" value="50">
+        </div>
+    </div>
+    <script>
+        const TRANSFORMS = {
+            ROTATE: 'rotate',
+            SCALE: 'scale',
+            SHEAR: 'shear',
+            REFLECT: 'reflect',
+            PROJECT_X: 'project-x',        // Projection onto x-axis
+            PROJECT_VECTOR: 'project-vec', // Projection onto vector [1,2]
+            PERMUTE: 'permute'            // Permutation matrix
+        };
+
+        const state = {
+            currentTransform: TRANSFORMS.ROTATE,
+            t: 0.5,
+            matrix: {a: 1, b: 0, c: 0, d: 1}
+        };
+
+        function getTransformMatrix(type, t) {
+            switch(type) {
+                case TRANSFORMS.ROTATE:
+                    const angle = (t - 0.5) * 2 * Math.PI;
+                    return {
+                        a: Math.cos(angle),
+                        b: -Math.sin(angle),
+                        c: Math.sin(angle),
+                        d: Math.cos(angle)
+                    };
+                case TRANSFORMS.SCALE:
+                    const scaleX = 1 + (t - 0.5) * 2;
+                    const scaleY = 1 + (0.5 - t) * 2;
+                    return {
+                        a: scaleX,
+                        b: 0,
+                        c: 0,
+                        d: scaleY
+                    };
+                case TRANSFORMS.SHEAR:
+                    return {
+                        a: 1,
+                        b: (t - 0.5) * 4,
+                        c: 0,
+                        d: 1
+                    };
+                case TRANSFORMS.REFLECT:
+                    const reflectAngle = t * Math.PI;
+                    return {
+                        a: Math.cos(2 * reflectAngle),
+                        b: Math.sin(2 * reflectAngle),
+                        c: Math.sin(2 * reflectAngle),
+                        d: -Math.cos(2 * reflectAngle)
+                    };
+                case TRANSFORMS.PROJECT_X:
+                    // Smoothly transition to x-axis projection
+                    const yScale = 1 - t;  // gradually reduce y component to 0
+                    return {
+                        a: 1, b: 0,
+                        c: 0, d: yScale
+                    };
+
+                case TRANSFORMS.PROJECT_VECTOR:
+                    // Project onto vector v = [1,2]
+                    // Smoothly transition from identity to projection matrix
+                    const v = [1, 2];
+                    const vMagnitudeSq = v[0]*v[0] + v[1]*v[1]; // = 5
+                    const projMatrix = {
+                        a: v[0]*v[0]/vMagnitudeSq,    // 1/5
+                        b: v[0]*v[1]/vMagnitudeSq,    // 2/5
+                        c: v[0]*v[1]/vMagnitudeSq,    // 2/5
+                        d: v[1]*v[1]/vMagnitudeSq     // 4/5
+                    };
+
+                                // Interpolate between identity matrix and projection matrix
+                    return {
+                        a: 1 + t * (projMatrix.a - 1),
+                        b: t * projMatrix.b,
+                        c: t * projMatrix.c,
+                        d: 1 + t * (projMatrix.d - 1)
+                    };
+
+                case TRANSFORMS.PERMUTE:
+                    // Smoothly interpolate between permutations
+                    const phase = Math.floor(t * 3); // 0, 1, or 2
+                    const fracT = (t * 3) % 1; // fractional part for smooth transition
+                    
+                    let start, end;
+                    if (phase === 0) {
+                        // Transition to swap x and y
+                        start = {a: 1, b: 0, c: 0, d: 1};
+                        end = {a: 0, b: 1, c: 1, d: 0};
+                    } else if (phase === 1) {
+                        // Transition to negate x
+                        start = {a: 0, b: 1, c: 1, d: 0};
+                        end = {a: -1, b: 0, c: 0, d: 1};
+                    } else {
+                        // Transition to negate y
+                        start = {a: -1, b: 0, c: 0, d: 1};
+                        end = {a: 1, b: 0, c: 0, d: -1};
+                    }
+
+                    // Interpolate between start and end matrices
+                    return {
+                        a: start.a + fracT * (end.a - start.a),
+                        b: start.b + fracT * (end.b - start.b),
+                        c: start.c + fracT * (end.c - start.c),
+                        d: start.d + fracT * (end.d - start.d)
+                    };
+
+                default:
+                    return {a: 1, b: 0, c: 0, d: 1};
+            }
+        }
+
+        function arrow(ctx, x1, y1, x2, y2, s) {
+            let a = Math.atan2(y2 - y1, x2 - x1);
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2-0.8*s*Math.cos(a), y2-0.8*s*Math.sin(a));
+            ctx.lineTo(x2-s*Math.cos(a-Math.PI/7), y2-s*Math.sin(a-Math.PI/7));
+            ctx.lineTo(x2, y2);
+            ctx.lineTo(x2-s*Math.cos(a+Math.PI/7), y2-s*Math.sin(a+Math.PI/7));
+            ctx.lineTo(x2-0.8*s*Math.cos(a), y2-0.8*s*Math.sin(a));
+            ctx.closePath();
+            ctx.stroke();
+            ctx.fill();
+        }
+
+        function toScreen(canvas, x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 8;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2 - y * scale
+            };
+        }
+
+        function drawGrid(ctx, matrix) {
+            const gridSize = 5;
+            
+            // Draw original grid (faint)
+            ctx.strokeStyle = '#777';
+            ctx.lineWidth = 1;
+            for(let i = -gridSize; i <= gridSize; i++) {
+                const start1 = toScreen(ctx.canvas, i, -gridSize);
+                const end1 = toScreen(ctx.canvas, i, gridSize);
+                const start2 = toScreen(ctx.canvas, -gridSize, i);
+                const end2 = toScreen(ctx.canvas, gridSize, i);
+                
+                ctx.beginPath();
+                ctx.moveTo(start1.x, start1.y);
+                ctx.lineTo(end1.x, end1.y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+            }
+
+            // Draw transformed grid
+            ctx.strokeStyle = '#1a8888';
+            for(let i = -gridSize; i <= gridSize; i++) {
+                for(let j = -gridSize; j <= gridSize; j++) {
+                    // Transform points
+                    const p = {
+                        x: matrix.a * i + matrix.b * j,
+                        y: matrix.c * i + matrix.d * j
+                    };
+                    const px = {
+                        x: matrix.a * (i+1) + matrix.b * j,
+                        y: matrix.c * (i+1) + matrix.d * j
+                    };
+                    const py = {
+                        x: matrix.a * i + matrix.b * (j+1),
+                        y: matrix.c * i + matrix.d * (j+1)
+                    };
+
+                    const start = toScreen(ctx.canvas, p.x, p.y);
+                    const endX = toScreen(ctx.canvas, px.x, px.y);
+                    const endY = toScreen(ctx.canvas, py.x, py.y);
+
+                    ctx.beginPath();
+                    ctx.moveTo(start.x, start.y);
+                    ctx.lineTo(endX.x, endX.y);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(start.x, start.y);
+                    ctx.lineTo(endY.x, endY.y);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawVector(ctx, vec, color = '#ffff00', width = 2, label = '') {
+            const start = toScreen(ctx.canvas, 0, 0);
+            const end = toScreen(ctx.canvas, vec.x, vec.y);
+            
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = width;
+            
+            arrow(ctx, start.x, start.y, end.x, end.y, 0.2);
+
+            if(label) {
+                ctx.font = '16px monospace';
+                ctx.fillStyle = color;
+                ctx.fillText(label, end.x + 10, end.y);
+            }
+        }
+
+        function updateMatrixInfo(matrix) {
+            const info = document.getElementById('matrix-info');
+            let matrixFormula = '';
+
+            switch(state.currentTransform) {
+                case TRANSFORMS.ROTATE:
+                    const theta = (state.t - 0.5) * 2 * Math.PI;
+                    matrixFormula = `
+                        Rotation Matrix (θ = ${(theta * 180 / Math.PI).toFixed(1)}°):<br>
+                        [cos θ  -sin θ]  =  [${matrix.a.toFixed(2)} ${matrix.b.toFixed(2)}]<br>
+                        [sin θ   cos θ]     [${matrix.c.toFixed(2)} ${matrix.d.toFixed(2)}]
+                    `;
+                    break;
+                    
+                case TRANSFORMS.SCALE:
+                    const sx = 1 + (state.t - 0.5) * 2;
+                    const sy = 1 + (0.5 - state.t) * 2;
+                    matrixFormula = `
+                        Scaling Matrix:<br>
+                        [sx   0]  =  [${matrix.a.toFixed(2)} ${matrix.b.toFixed(2)}]<br>
+                        [0   sy]     [${matrix.c.toFixed(2)} ${matrix.d.toFixed(2)}]<br>
+                        sx = ${sx.toFixed(2)}, sy = ${sy.toFixed(2)}
+                    `;
+                    break;
+                    
+                case TRANSFORMS.SHEAR:
+                    const k = (state.t - 0.5) * 4;
+                    matrixFormula = `
+                        Horizontal Shear Matrix:<br>
+                        [1   k]  =  [${matrix.a.toFixed(2)} ${matrix.b.toFixed(2)}]<br>
+                        [0   1]     [${matrix.c.toFixed(2)} ${matrix.d.toFixed(2)}]<br>
+                        k = ${k.toFixed(2)}
+                    `;
+                    break;
+                    
+                case TRANSFORMS.REFLECT:
+                    const angle = state.t * Math.PI;
+                    matrixFormula = `
+                        Reflection Matrix (${(angle * 180 / Math.PI).toFixed(1)}°):<br>
+                        [cos 2θ   sin 2θ]  =  [${matrix.a.toFixed(2)} ${matrix.b.toFixed(2)}]<br>
+                        [sin 2θ  -cos 2θ]     [${matrix.c.toFixed(2)} ${matrix.d.toFixed(2)}]
+                    `;
+                    break;
+                case TRANSFORMS.PROJECT_X:
+                    matrixFormula = `
+                        X-Axis Projection Matrix:<br>
+                        [1 0]  =  [${matrix.a.toFixed(2)} ${matrix.b.toFixed(2)}]<br>
+                        [0 0]     [${matrix.c.toFixed(2)} ${matrix.d.toFixed(2)}]<br>
+                        Projects any vector onto x-axis
+                    `;
+                    break;
+
+                case TRANSFORMS.PROJECT_VECTOR:
+                    matrixFormula = `
+                        Vector Projection Matrix:<br>
+                        v = [1, 2]<br>
+                        P = vvᵀ/‖v‖² = <br>
+                        [1/5 2/5]  =  [${matrix.a.toFixed(2)} ${matrix.b.toFixed(2)}]<br>
+                        [2/5 4/5]     [${matrix.c.toFixed(2)} ${matrix.d.toFixed(2)}]<br>
+                        Projects onto vector [1,2]
+                    `;
+                    break;
+
+                case TRANSFORMS.PERMUTE:
+                    const phase = Math.floor(state.t * 3);
+                    const description = phase === 0 ? "Swap x and y" : 
+                                    phase === 1 ? "Negate x" : "Negate y";
+                    matrixFormula = `
+                        Permutation Matrix:<br>
+                        [${matrix.a.toFixed(0)} ${matrix.b.toFixed(0)}]<br>
+                        [${matrix.c.toFixed(0)} ${matrix.d.toFixed(0)}]<br>
+                        Operation: ${description}
+                    `;
+                    break;
+            }
+
+            info.innerHTML = `
+                ${matrixFormula}<br>
+                <br>
+                Transformed Basis Vectors:<br>
+                î = [${matrix.a.toFixed(2)}, ${matrix.c.toFixed(2)}]<br>
+                ĵ = [${matrix.b.toFixed(2)}, ${matrix.d.toFixed(2)}]
+            `;
+        }
+
+        function draw() {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Clear canvas
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Get current transformation matrix
+            const matrix = getTransformMatrix(state.currentTransform, state.t);
+            state.matrix = matrix;
+
+            // Draw grid
+            drawGrid(ctx, matrix);
+
+            // Draw transformed basis vectors
+            drawVector(ctx, {x: matrix.a, y: matrix.c}, '#8cbe63', 2, 'î');
+            drawVector(ctx, {x: matrix.b, y: matrix.d}, '#ff7c5c', 2, 'ĵ');
+
+            // Update matrix info
+            updateMatrixInfo(matrix);
+        }
+
+        function init() {
+            const canvas = document.getElementById('canvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            // Add event listeners for transformation type buttons
+            Object.values(TRANSFORMS).forEach(type => {
+                document.getElementById(`${type}-btn`).addEventListener('click', () => {
+                    state.currentTransform = type;
+                    // Update active button
+                    document.querySelectorAll('.transform-type button').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    document.getElementById(`${type}-btn`).classList.add('active');
+                    draw();
+                });
+            });
+
+            // Add slider listener
+            document.getElementById('transform-slider').addEventListener('input', (e) => {
+                state.t = e.target.value / 100;
+                draw();
+            });
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                draw();
+            });
+
+            // Initial draw
+            draw();
+        }
+
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

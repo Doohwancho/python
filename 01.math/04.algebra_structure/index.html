@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { 
+            margin: 0; 
+            background: black; 
+            color: white; 
+            font-family: monospace; 
+        }
+        canvas { 
+            display: block; 
+        }
+        .panel {
+            position: fixed;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        #controls {
+            top: 20px;
+            left: 20px;
+        }
+        #info {
+            top: 20px;
+            right: 20px;
+            width: 400px;
+        }
+        .tab {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 0 5px;
+            cursor: pointer;
+            border: 1px solid #666;
+            border-radius: 4px;
+        }
+        .tab.active {
+            background: #444;
+        }
+        .value {
+            color: #88ff88;
+            font-weight: bold;
+        }
+        .section {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #444;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="controls" class="panel">
+        <div class="tab-container">
+            <span class="tab active" data-concept="vectors">Vectors & Geometry</span>
+            <span class="tab" data-concept="matrix">Matrix Properties</span>
+            <span class="tab" data-concept="spaces">Vector Spaces</span>
+            <span class="tab" data-concept="eigen">Eigentheory</span>
+        </div><br>
+        DRAG: Move vectors | SPACE: Toggle animation | A: Toggle addition
+    </div>
+    <div id="info" class="panel"></div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const info = document.getElementById('info');
+        const tabs = document.querySelectorAll('.tab');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let concept = 'vectors';
+        let isAnimating = true;
+        let showAddition = false;
+        let time = 0;
+        let isDragging = false;
+        let v = { x: 2, y: 1 };
+        let w = { x: 3, y: 0 };
+
+        function toScreen(x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 16;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2 - y * scale
+            };
+        }
+
+        function fromScreen(x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 16;
+            return {
+                x: (x - canvas.width/2) / scale,
+                y: -(y - canvas.height/2) / scale
+            };
+        }
+
+        function dot(v1, v2) {
+            return v1.x * v2.x + v1.y * v2.y;
+        }
+
+        function length(v) {
+            return Math.sqrt(dot(v, v));
+        }
+
+        function scale(v, s) {
+            return { x: v.x * s, y: v.y * s };
+        }
+
+        function drawGrid(withNumbers = true) {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            
+            for(let i = -10; i <= 10; i++) {
+                const start1 = toScreen(i, -10);
+                const end1 = toScreen(i, 10);
+                const start2 = toScreen(-10, i);
+                const end2 = toScreen(10, i);
+                
+                ctx.beginPath();
+                ctx.moveTo(start1.x, start1.y);
+                ctx.lineTo(end1.x, end1.y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+
+                if(withNumbers && i !== 0) {
+                    ctx.fillStyle = '#666';
+                    ctx.font = '12px monospace';
+                    const xPos = toScreen(i, 0);
+                    const yPos = toScreen(0, i);
+                    ctx.fillText(i.toString(), xPos.x - 6, xPos.y + 15);
+                    ctx.fillText(i.toString(), yPos.x - 15, yPos.y + 4);
+                }
+            }
+        }
+
+        function drawVector(vec, color = '#ffff00', width = 2, label = '') {
+            const start = toScreen(0, 0);
+            const end = toScreen(vec.x, vec.y);
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+
+            // Arrow head
+            const angle = Math.atan2(end.y - start.y, end.x - start.x);
+            ctx.beginPath();
+            ctx.moveTo(end.x, end.y);
+            ctx.lineTo(
+                end.x - 15 * Math.cos(angle - Math.PI/6),
+                end.y - 15 * Math.sin(angle - Math.PI/6)
+            );
+            ctx.lineTo(
+                end.x - 15 * Math.cos(angle + Math.PI/6),
+                end.y - 15 * Math.sin(angle + Math.PI/6)
+            );
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            if(label) {
+                ctx.fillStyle = color;
+                ctx.font = '16px monospace';
+                ctx.fillText(label, end.x + 10, end.y + 10);
+            }
+        }
+
+        function drawVectorAddition(v1, v2) {
+            // Draw original vectors
+            drawVector(v1, '#ff8888', 3, 'v₁');
+            
+            // Draw v2 from tip of v1
+            const start = toScreen(v1.x, v1.y);
+            const end = toScreen(v1.x + v2.x, v1.y + v2.y);
+            ctx.strokeStyle = '#88ff88';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+            
+            // Draw resultant vector
+            drawVector(
+                {x: v1.x + v2.x, y: v1.y + v2.y}, 
+                '#ffff00', 3, 'v₁+v₂'
+            );
+        }
+
+        function drawVectorsAndGeometry() {
+            // Draw basic vectors
+            if(showAddition) {
+                drawVectorAddition(v, w);
+            } else {
+                drawVector(v, '#ff8888', 3, 'v');
+                drawVector(w, '#88ff88', 3, 'w');
+            }
+
+            // Calculate geometric properties
+            const dotProduct = dot(v, w);
+            const normV = length(v);
+            const normW = length(w);
+            const angle = Math.acos(dotProduct/(normV * normW));
+            const orthogonality = Math.abs(dotProduct);
+            
+            // Draw projection
+            const proj = scale(w, dotProduct/dot(w,w));
+            drawVector(proj, '#ffff00', 2, 'proj');
+            
+            // Draw projection line
+            ctx.strokeStyle = '#4488ff';
+            ctx.setLineDash([5, 5]);
+            const vPoint = toScreen(v.x, v.y);
+            const projPoint = toScreen(proj.x, proj.y);
+            ctx.beginPath();
+            ctx.moveTo(vPoint.x, vPoint.y);
+            ctx.lineTo(projPoint.x, projPoint.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Show angle arc
+            const origin = toScreen(0, 0);
+            const angleV = Math.atan2(v.y, v.x);
+            const angleW = Math.atan2(w.y, w.x);
+            ctx.strokeStyle = '#ffff88';
+            ctx.beginPath();
+            ctx.arc(origin.x, origin.y, 30, 
+                Math.min(angleV, angleW), 
+                Math.max(angleV, angleW));
+            ctx.stroke();
+
+            info.innerHTML = `
+                <div class="section">
+                    <h3>Vector Properties</h3>
+                    • v = [<span class="value">${v.x.toFixed(2)}, ${v.y.toFixed(2)}</span>]<br>
+                    • ||v|| = <span class="value">${normV.toFixed(2)}</span><br>
+                    • w = [<span class="value">${w.x.toFixed(2)}, ${w.y.toFixed(2)}</span>]<br>
+                    • ||w|| = <span class="value">${normW.toFixed(2)}</span>
+                </div>
+                <div class="section">
+                    <h3>Geometric Relations</h3>
+                    • Inner product (v·w): <span class="value">${dotProduct.toFixed(2)}</span><br>
+                    • Angle: <span class="value">${(angle * 180/Math.PI).toFixed(2)}°</span><br>
+                    • Orthogonality: <span class="value">${orthogonality.toFixed(2)}</span><br>
+                    • Projection length: <span class="value">${length(proj).toFixed(2)}</span>
+                </div>
+            `;
+        }
+
+        function drawMatrixProperties() {
+            const theta = time;
+            const matrix = [
+                [Math.cos(theta), -Math.sin(theta)],
+                [Math.sin(theta), Math.cos(theta)]
+            ];
+
+            // Draw original basis vectors
+            drawVector({x: 1, y: 0}, '#ff8888', 2, 'i');
+            drawVector({x: 0, y: 1}, '#88ff88', 2, 'j');
+            
+            // Draw transformed basis vectors
+            const v1 = {x: matrix[0][0], y: matrix[1][0]};
+            const v2 = {x: matrix[0][1], y: matrix[1][1]};
+            drawVector(v1, '#ff4444', 3, 'Ai');
+            drawVector(v2, '#44ff44', 3, 'Aj');
+
+            // Show area change (determinant)
+            ctx.fillStyle = '#ffff0044';
+            ctx.beginPath();
+            const origin = toScreen(0, 0);
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(toScreen(v1.x, v1.y).x, toScreen(v1.x, v1.y).y);
+            ctx.lineTo(toScreen(v1.x + v2.x, v1.y + v2.y).x, toScreen(v1.x + v2.x, v1.y + v2.y).y);
+            ctx.lineTo(toScreen(v2.x, v2.y).x, toScreen(v2.y, v2.y).y);
+            ctx.closePath();
+            ctx.fill();
+
+            const det = matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
+            const trace = matrix[0][0] + matrix[1][1];
+
+            info.innerHTML = `
+                <div class="section">
+                    <h3>Matrix Properties</h3>
+                    • Matrix A = [<span class="value">${matrix[0][0].toFixed(2)} ${matrix[0][1].toFixed(2)}</span>]<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[<span class="value">${matrix[1][0].toFixed(2)} ${matrix[1][1].toFixed(2)}</span>]
+                </div>
+                <div class="section">
+                    <h3>Transformation Effects</h3>
+                    • Determinant (area scale): <span class="value">${det.toFixed(2)}</span><br>
+                    • Trace (rotation hint): <span class="value">${trace.toFixed(2)}</span><br>
+                    • Is orthogonal: <span class="value">${Math.abs(det - 1) < 0.01 ? 'Yes' : 'No'}</span><br>
+                    • Preserves lengths: <span class="value">${Math.abs(det - 1) < 0.01 ? 'Yes' : 'No'}</span>
+                </div>
+            `;
+        }
+
+        function drawSpaces() {
+            // Draw span with brighter colors
+            ctx.fillStyle = '#ffff0088';
+            for(let i = -2; i <= 2; i += 0.1) {
+                for(let j = -2; j <= 2; j += 0.1) {
+                    const p = {
+                        x: v.x * i + w.x * j,
+                        y: v.y * i + w.y * j
+                    };
+                    const screen = toScreen(p.x, p.y);
+                    ctx.beginPath();
+                    ctx.arc(screen.x, screen.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            drawVector(v, '#ff8888', 3, 'v');
+            drawVector(w, '#88ff88', 3, 'w');
+
+            const det = v.x * w.y - v.y * w.x;
+            info.innerHTML = `
+                <div class="section">
+                    <h3>Vector Space Properties</h3>
+                    • Vectors span: <span class="value">${Math.abs(det) < 0.1 ? 'line' : 'plane'}</span><br>
+                    • Dimension: <span class="value">${Math.abs(det) < 0.1 ? '1' : '2'}</span><br>
+                    • Linearly independent: <span class="value">${Math.abs(det) < 0.1 ? 'No' : 'Yes'}</span>
+                </div>
+                <div class="section">
+                    <h3>Space Characteristics</h3>
+                    • Area of parallelogram: <span class="value">${Math.abs(det).toFixed(2)}</span><br>
+                    • Forms basis: <span class="value">${Math.abs(det) < 0.1 ? 'No' : 'Yes'}</span>
+                </div>
+            `;
+        }
+
+        function drawEigentheory() {
+            // Create a 2x2 matrix based on time
+            const theta = time * 0.5;
+            const matrix = [
+                [2 * Math.cos(theta), Math.sin(theta)],
+                [Math.sin(theta), Math.cos(theta)]
+            ];
+
+            // Find eigenvalues (using characteristic equation)
+            const a = matrix[0][0];
+            const b = matrix[0][1];
+            const c = matrix[1][0];
+            const d = matrix[1][1];
+            
+            const trace = a + d;
+            const det = a * d - b * c;
+            
+            // Quadratic formula for eigenvalues
+            const discriminant = Math.sqrt(trace * trace - 4 * det);
+            const lambda1 = (trace + discriminant) / 2;
+            const lambda2 = (trace - discriminant) / 2;
+
+            // Find eigenvectors
+            function findEigenvector(lambda) {
+                // (A - λI)v = 0
+                const x = b === 0 ? 1 : 1;
+                const y = b === 0 ? 0 : -(a - lambda) / b;
+                const length = Math.sqrt(x*x + y*y);
+                return {x: x/length, y: y/length};
+            }
+
+            const v1 = findEigenvector(lambda1);
+            const v2 = findEigenvector(lambda2);
+
+            // Draw original vectors
+            drawVector(v1, '#ff8888', 2, 'v₁');
+            drawVector(v2, '#88ff88', 2, 'v₂');
+
+            // Draw transformed vectors
+            const tv1 = {
+                x: matrix[0][0]*v1.x + matrix[0][1]*v1.y,
+                y: matrix[1][0]*v1.x + matrix[1][1]*v1.y
+            };
+            const tv2 = {
+                x: matrix[0][0]*v2.x + matrix[0][1]*v2.y,
+                y: matrix[1][0]*v2.x + matrix[1][1]*v2.y
+            };
+            drawVector(tv1, '#ff4444', 3, 'Av₁');
+            drawVector(tv2, '#44ff44', 3, 'Av₂');
+
+            // Draw eigenspaces (lines through eigenvectors)
+            ctx.strokeStyle = '#ffff0044';
+            ctx.setLineDash([5, 5]);
+            
+            for(let v of [v1, v2]) {
+                const start = toScreen(-3*v.x, -3*v.y);
+                const end = toScreen(3*v.x, 3*v.y);
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+
+            // Show diagonalization visualization
+            ctx.fillStyle = '#ffff0044';
+            const origin = toScreen(0, 0);
+            const diagEnd = toScreen(lambda1*v1.x, lambda1*v1.y);
+            const otherEnd = toScreen(lambda2*v2.x, lambda2*v2.y);
+            ctx.beginPath();
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(diagEnd.x, diagEnd.y);
+            ctx.lineTo(diagEnd.x + otherEnd.x - origin.x, diagEnd.y + otherEnd.y - origin.y);
+            ctx.lineTo(otherEnd.x, otherEnd.y);
+            ctx.closePath();
+            ctx.fill();
+
+            info.innerHTML = `
+                <div class="section">
+                    <h3>Matrix</h3>
+                    • A = [<span class="value">${matrix[0][0].toFixed(2)} ${matrix[0][1].toFixed(2)}</span>]<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[<span class="value">${matrix[1][0].toFixed(2)} ${matrix[1][1].toFixed(2)}</span>]
+                </div>
+                <div class="section">
+                    <h3>Eigenvalues (λ)</h3>
+                    • λ₁ = <span class="value">${lambda1.toFixed(2)}</span><br>
+                    • λ₂ = <span class="value">${lambda2.toFixed(2)}</span><br>
+                    • det(A-λI) = λ² - ${trace.toFixed(2)}λ + ${det.toFixed(2)}
+                </div>
+                <div class="section">
+                    <h3>Eigenvectors</h3>
+                    • v₁ = [<span class="value">${v1.x.toFixed(2)}, ${v1.y.toFixed(2)}</span>]<br>
+                    • v₂ = [<span class="value">${v2.x.toFixed(2)}, ${v2.y.toFixed(2)}</span>]<br>
+                    • Av₁ = λ₁v₁, Av₂ = λ₂v₂
+                </div>
+            `;
+        }
+
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid(concept !== 'matrix');
+
+            switch(concept) {
+                case 'vectors':
+                    drawVectorsAndGeometry();
+                    break;
+                case 'matrix':
+                    drawMatrixProperties();
+                    break;
+                case 'spaces':
+                    drawSpaces();
+                    break;
+                case 'eigen':
+                    drawEigentheory();
+                    break;
+            }
+        }
+
+        function animate() {
+            if(isAnimating) {
+                time += 0.02;
+                if(!isDragging && (concept === 'matrix' || concept === 'spaces')) {
+                    draw();
+                }
+                requestAnimationFrame(animate);
+            }
+        }
+
+        // Event Listeners
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                concept = tab.dataset.concept;
+                draw();
+            });
+        });
+
+        canvas.addEventListener('mousedown', e => {
+            if(concept !== 'matrix') {
+                isDragging = true;
+                const pos = fromScreen(e.clientX, e.clientY);
+                // Determine which vector is closer to click
+                const distToV = Math.hypot(pos.x - v.x, pos.y - v.y);
+                const distToW = Math.hypot(pos.x - w.x, pos.y - w.y);
+                if(distToV < distToW) {
+                    v = pos;
+                } else {
+                    w = pos;
+                }
+                draw();
+            }
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if(isDragging && concept !== 'matrix') {
+                const pos = fromScreen(e.clientX, e.clientY);
+                if(Math.hypot(pos.x - v.x, pos.y - v.y) < Math.hypot(pos.x - w.x, pos.y - w.y)) {
+                    v = pos;
+                } else {
+                    w = pos;
+                }
+                draw();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        document.addEventListener('keydown', e => {
+            if (event.ctrlKey || event.metaKey) {
+            switch(event.key) {
+                case ' ':
+                    isAnimating = !isAnimating;
+                    if(isAnimating) animate();
+                    break;
+                case 'a':
+                case 'A': 
+                    showAddition = !showAddition;
+                    draw();
+                    break;
+            }
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        });
+
+        // Start visualization
+        draw();
+        animate();
+    </script>
+</body>
+</html>

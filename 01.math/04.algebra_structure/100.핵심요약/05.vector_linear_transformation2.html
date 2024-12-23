@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { 
+            margin: 0; 
+            background: black; 
+            color: white; 
+            font-family: monospace;
+            overflow: hidden;
+        }
+        canvas { display: block; }
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 300px;
+        }
+        #matrix {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="info">
+        Press:<br>
+        1: Rotation<br>
+        2: Scaling (Uniform)<br>
+        3: Scaling (Non-uniform)<br>
+        4: Shear<br>
+        5: Reflection<br>
+        6: Projection<br>
+        7: Transpose<br>
+        8: Inverse<br>
+        9: Determinant<br>
+        0: Translation<br>
+        SPACE: Toggle Animation
+    </div>
+    <div id="matrix"></div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const matrixDiv = document.getElementById('matrix');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let mode = 1;
+        let isAnimating = true;
+        let time = 0;
+
+        // Convert to screen coordinates
+        function toScreen(x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 8;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2 - y * scale
+            };
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            
+            for(let i = -10; i <= 10; i++) {
+                const start1 = toScreen(i, -10);
+                const end1 = toScreen(i, 10);
+                const start2 = toScreen(-10, i);
+                const end2 = toScreen(10, i);
+                
+                ctx.beginPath();
+                ctx.moveTo(start1.x, start1.y);
+                ctx.lineTo(end1.x, end1.y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+            }
+        }
+
+        function drawAxes() {
+            ctx.lineWidth = 2;
+            
+            // X axis
+            ctx.strokeStyle = '#ff4444';
+            const xStart = toScreen(-10, 0);
+            const xEnd = toScreen(10, 0);
+            ctx.beginPath();
+            ctx.moveTo(xStart.x, xStart.y);
+            ctx.lineTo(xEnd.x, xEnd.y);
+            ctx.stroke();
+
+            // Y axis
+            ctx.strokeStyle = '#44ff44';
+            const yStart = toScreen(0, -10);
+            const yEnd = toScreen(0, 10);
+            ctx.beginPath();
+            ctx.moveTo(yStart.x, yStart.y);
+            ctx.lineTo(yEnd.x, yEnd.y);
+            ctx.stroke();
+        }
+
+        function applyTransform(x, y, matrix) {
+            return {
+                x: matrix[0][0] * x + matrix[0][1] * y,
+                y: matrix[1][0] * x + matrix[1][1] * y
+            };
+        }
+
+        function drawVector(x, y, color = '#ffff00', width = 2) {
+            const start = toScreen(0, 0);
+            const end = toScreen(x, y);
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+
+            // Arrow head
+            const angle = Math.atan2(end.y - start.y, end.x - start.x);
+            ctx.beginPath();
+            ctx.moveTo(end.x, end.y);
+            ctx.lineTo(
+                end.x - 15 * Math.cos(angle - Math.PI/6),
+                end.y - 15 * Math.sin(angle - Math.PI/6)
+            );
+            ctx.lineTo(
+                end.x - 15 * Math.cos(angle + Math.PI/6),
+                end.y - 15 * Math.sin(angle + Math.PI/6)
+            );
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+
+        function drawShape(matrix) {
+            // Draw unit vectors
+            const i = applyTransform(1, 0, matrix);
+            const j = applyTransform(0, 1, matrix);
+            drawVector(i.x, i.y, '#ff8888', 3);
+            drawVector(j.x, j.y, '#88ff88', 3);
+
+            // Draw a square
+            ctx.strokeStyle = '#4488ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            const points = [
+                {x: -1, y: -1}, {x: 1, y: -1},
+                {x: 1, y: 1}, {x: -1, y: 1}
+            ].map(p => applyTransform(p.x, p.y, matrix))
+             .map(p => toScreen(p.x, p.y));
+
+            ctx.moveTo(points[0].x, points[0].y);
+            points.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        function getRotationMatrix(angle) {
+            return [
+                [Math.cos(angle), -Math.sin(angle)],
+                [Math.sin(angle), Math.cos(angle)]
+            ];
+        }
+
+        function getScalingMatrix(sx, sy = sx) {
+            return [[sx, 0], [0, sy]];
+        }
+
+        function getShearMatrix(k) {
+            return [[1, k], [0, 1]];
+        }
+
+        function getReflectionMatrix(angle) {
+            const c = Math.cos(2 * angle);
+            const s = Math.sin(2 * angle);
+            return [[c, s], [s, -c]];
+        }
+
+        function getProjectionMatrix(angle) {
+            const c = Math.cos(angle);
+            const s = Math.sin(angle);
+            return [
+                [c*c, c*s],
+                [c*s, s*s]
+            ];
+        }
+
+
+        function formatMatrix(matrix, mode, time) {
+            let explanation = '';
+            switch(mode) {
+                case 1: // Rotation
+                    const angle = (time * 180 / Math.PI) % 360;
+                    explanation = `
+                        Rotation Matrix (${angle.toFixed(0)}°):<br>
+                        [cos θ  -sin θ]<br>
+                        [sin θ   cos θ]<br><br>
+                        • Rotates vectors counter-clockwise<br>
+                        • Preserves length and angles<br>
+                        • det = 1 (area preserved)<br>
+                        • Orthogonal matrix: A⁻¹ = Aᵀ
+                    `;
+                    break;
+                case 2: // Uniform scaling
+                    const s = 1 + 0.5 * Math.sin(time);
+                    explanation = `
+                        Uniform Scaling (s=${s.toFixed(2)}):<br>
+                        [s  0]<br>
+                        [0  s]<br><br>
+                        • Scales equally in all directions<br>
+                        • det = s² (area scaled by s²)<br>
+                        • Preserves angles<br>
+                        • Commutes with rotation
+                    `;
+                    break;
+                case 3: // Non-uniform scaling
+                    const sx = 1 + 0.5 * Math.sin(time);
+                    const sy = 1 + 0.5 * Math.cos(time);
+                    explanation = `
+                        Non-uniform Scaling:<br>
+                        [sx   0]  sx=${sx.toFixed(2)}<br>
+                        [0   sy]  sy=${sy.toFixed(2)}<br><br>
+                        • Different scaling per axis<br>
+                        • det = sx·sy (area scaled by sx·sy)<br>
+                        • Changes angles<br>
+                        • Principal axes preserved
+                    `;
+                    break;
+                case 4: // Shear
+                    const k = Math.sin(time);
+                    explanation = `
+                        Shear Matrix (k=${k.toFixed(2)}):<br>
+                        [1  k]<br>
+                        [0  1]<br><br>
+                        • Shifts parallel to x-axis<br>
+                        • det = 1 (area preserved)<br>
+                        • Changes angles<br>
+                        • One eigenvector = [1,0]
+                    `;
+                    break;
+                case 5: // Reflection
+                    const reflectAngle = (time * 180 / Math.PI) % 360;
+                    explanation = `
+                        Reflection Matrix (${reflectAngle.toFixed(0)}°):<br>
+                        [cos 2θ   sin 2θ]<br>
+                        [sin 2θ  -cos 2θ]<br><br>
+                        • Reflects across line at angle θ<br>
+                        • det = -1 (flips orientation)<br>
+                        • Preserves distances<br>
+                        • A² = I (involution)
+                    `;
+                    break;
+                case 6: // Projection
+                    const projAngle = (time * 180 / Math.PI) % 360;
+                    explanation = `
+                        Projection Matrix (${projAngle.toFixed(0)}°):<br>
+                        [cos²θ   cosθsinθ]<br>
+                        [cosθsinθ   sin²θ]<br><br>
+                        • Projects onto line at angle θ<br>
+                        • det = 0 (collapses dimension)<br>
+                        • A² = A (idempotent)<br>
+                        • Symmetric matrix
+                    `;
+                    break;
+                case 7: // Transpose
+                    explanation = `
+                        Transpose:<br>
+                        [a  b]ᵀ = [a  c]<br>
+                        [c  d]    [b  d]<br><br>
+                        • Flips across main diagonal<br>
+                        • (AB)ᵀ = BᵀAᵀ<br>
+                        • (Aᵀ)ᵀ = A<br>
+                        • For rotation: Aᵀ = A⁻¹
+                    `;
+                    break;
+                case 8: // Inverse
+                    explanation = `
+                        Inverse Matrix:<br>
+                        [a  b]⁻¹ = 1/(ad-bc) [ d  -b]<br>
+                        [c  d]              [-c   a]<br><br>
+                        • AA⁻¹ = A⁻¹A = I<br>
+                        • Only exists if det ≠ 0<br>
+                        • (AB)⁻¹ = B⁻¹A⁻¹<br>
+                        • Changes input to output
+                    `;
+                    break;
+                case 9: // Determinant
+                    const det = matrix[0][0]*matrix[1][1] - matrix[0][1]*matrix[1][0];
+                    explanation = `
+                        Determinant = ${det.toFixed(2)}<br>
+                        det[a  b] = ad - bc<br>
+                        [c  d]<br><br>
+                        • Measures area scaling<br>
+                        • det(AB) = det(A)·det(B)<br>
+                        • det = 0 → not invertible<br>
+                        • Negative → flips orientation
+                    `;
+                    break;
+                case 0: // Translation
+                    explanation = `
+                        Translation (non-linear!):<br>
+                        [x] → [x + tx]<br>
+                        [y]   [y + ty]<br><br>
+                        • Needs homogeneous coords<br>
+                        • [x y 1] → [x+tx y+ty 1]<br>
+                        • Cannot be 2×2 matrix<br>
+                        • Requires 3×3 matrix
+                    `;
+                    break;
+            }
+            return `Current Matrix:<br>[${matrix[0][0].toFixed(2)} ${matrix[0][1].toFixed(2)}]<br>[${matrix[1][0].toFixed(2)} ${matrix[1][1].toFixed(2)}]<br><br>${explanation}`;
+        }
+
+        function getTransposeMatrix(matrix) {
+            return [
+                [matrix[0][0], matrix[1][0]],
+                [matrix[0][1], matrix[1][1]]
+            ];
+        }
+
+        function getInverseMatrix(matrix) {
+            const det = matrix[0][0]*matrix[1][1] - matrix[0][1]*matrix[1][0];
+            if(Math.abs(det) < 0.0001) return [[1,0],[0,1]];  // Return identity if not invertible
+            return [
+                [ matrix[1][1]/det, -matrix[0][1]/det],
+                [-matrix[1][0]/det,  matrix[0][0]/det]
+            ];
+        }
+
+        function getDeterminantMatrix(time) {
+            const scale = 1 + Math.sin(time);
+            return getScalingMatrix(scale, 1/scale);  // Area-preserving transformation
+        }
+
+        function getTranslationMatrix(time) {
+            const tx = Math.cos(time);
+            const ty = Math.sin(time);
+            // Note: Actually applies shear since we can't do true translation in 2×2
+            return [[1, tx], [ty, 1]];
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+            drawAxes();
+
+            let matrix;
+
+            switch(mode) {
+                case 1: 
+                    matrix = getRotationMatrix(time);
+                    break;
+                case 2: 
+                    matrix = getScalingMatrix(1 + 0.5 * Math.sin(time));
+                    break;
+                case 3: 
+                    matrix = getScalingMatrix(1 + 0.5 * Math.sin(time), 1 + 0.5 * Math.cos(time));
+                    break;
+                case 4: 
+                    matrix = getShearMatrix(Math.sin(time));
+                    break;
+                case 5: 
+                    matrix = getReflectionMatrix(time);
+                    break;
+                case 6: 
+                    matrix = getProjectionMatrix(time);
+                    break;
+                case 7:
+                    matrix = getTransposeMatrix(getRotationMatrix(time));
+                    break;
+                case 8:
+                    matrix = getInverseMatrix(getRotationMatrix(time));
+                    break;
+                case 9:
+                    matrix = getDeterminantMatrix(time);
+                    break;
+                case 0:
+                    matrix = getTranslationMatrix(time);
+                    break;
+            }
+
+            drawShape(matrix);
+            // mode와 time을 인자로 전달
+            matrixDiv.innerHTML = formatMatrix(matrix, mode, time);
+        }
+
+        document.addEventListener('keydown', e => {
+            // ctrlKey 조건 제거하고 키 범위 확장
+            if(e.key >= '0' && e.key <= '9') {
+                mode = parseInt(e.key);
+                draw();
+            } else if(e.key === ' ') {
+                isAnimating = !isAnimating;
+                if(isAnimating) animate();
+            }
+        });
+
+        function animate() {
+            if(isAnimating) {
+                time += 0.02;
+                draw();
+                requestAnimationFrame(animate);
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        });
+
+        animate();
+    </script>
+</body>
+</html>

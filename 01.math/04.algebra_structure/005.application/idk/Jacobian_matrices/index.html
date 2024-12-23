@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { 
+            margin: 0; 
+            background: #1a1a1a;
+            color: white;
+            font-family: system-ui, sans-serif;
+            padding: 20px;
+        }
+        canvas { 
+            background: black;
+            border-radius: 8px;
+        }
+        .controls {
+            margin-top: 10px;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .explanation {
+            margin-top: 10px;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="controls">
+        Press 1: Linear Transformation view<br>
+        Press 2: Derivative as Linear Approximation<br>
+        Press 3: Jacobian Matrix visualization<br>
+        Space: Toggle animation<br>
+        Drag to rotate
+    </div>
+    <div id="explanation" class="explanation">
+        Showing how derivatives act as linear transformations
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const explanation = document.getElementById('explanation');
+        
+        canvas.width = Math.min(800, window.innerWidth - 40);
+        canvas.height = 500;
+
+        let rotationX = Math.PI/4;
+        let rotationY = -Math.PI/4;
+        let isDragging = false;
+        let lastMouseX, lastMouseY;
+        let currentMode = 1;
+        let isAnimating = true;
+        let time = 0;
+
+        const colors = {
+            grid: '#333',
+            axes: '#666',
+            original: '#4488ff',
+            transformed: '#ff4488',
+            vector: '#00ff88',
+            text: '#ffffff'
+        };
+
+        // 3D projection
+        function project(x, y, z) {
+            const cos1 = Math.cos(rotationY);
+            const sin1 = Math.sin(rotationY);
+            const cos2 = Math.cos(rotationX);
+            const sin2 = Math.sin(rotationX);
+
+            const x1 = x * cos1 + z * sin1;
+            const y1 = y;
+            const z1 = -x * sin1 + z * cos1;
+
+            const x2 = x1;
+            const y2 = y1 * cos2 - z1 * sin2;
+            const z2 = y1 * sin2 + z1 * cos2;
+
+            const scale = 80;
+            const perspective = 1000;
+            const factor = perspective / (perspective + z2);
+
+            return {
+                x: canvas.width/2 + x2 * scale * factor,
+                y: canvas.height/2 + y2 * scale * factor,
+                z: z2
+            };
+        }
+
+        function drawAxes() {
+            const size = 5;
+            const origin = project(0, 0, 0);
+            
+            // X-axis (red)
+            const xEnd = project(size, 0, 0);
+            ctx.beginPath();
+            ctx.strokeStyle = '#ff6666';
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(xEnd.x, xEnd.y);
+            ctx.stroke();
+            ctx.fillStyle = '#ff6666';
+            ctx.fillText('x', xEnd.x + 10, xEnd.y);
+
+            // Y-axis (green)
+            const yEnd = project(0, size, 0);
+            ctx.beginPath();
+            ctx.strokeStyle = '#66ff66';
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(yEnd.x, yEnd.y);
+            ctx.stroke();
+            ctx.fillStyle = '#66ff66';
+            ctx.fillText('y', yEnd.x + 10, yEnd.y);
+
+            // Z-axis (blue)
+            const zEnd = project(0, 0, size);
+            ctx.beginPath();
+            ctx.strokeStyle = '#6666ff';
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(zEnd.x, zEnd.y);
+            ctx.stroke();
+            ctx.fillStyle = '#6666ff';
+            ctx.fillText('z', zEnd.x + 10, zEnd.y);
+        }
+
+        function drawGrid() {
+            const size = 5;
+            ctx.strokeStyle = colors.grid;
+            ctx.lineWidth = 0.5;
+
+            // XY plane grid
+            for(let i = -size; i <= size; i++) {
+                const start1 = project(i, -size, 0);
+                const end1 = project(i, size, 0);
+                ctx.beginPath();
+                ctx.moveTo(start1.x, start1.y);
+                ctx.lineTo(end1.x, end1.y);
+                ctx.stroke();
+
+                const start2 = project(-size, i, 0);
+                const end2 = project(size, i, 0);
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+            }
+        }
+
+        function drawLinearTransformation() {
+            // Draw original unit vectors
+            const origin = project(0, 0, 0);
+            const i = project(1, 0, 0);
+            const j = project(0, 1, 0);
+
+            ctx.strokeStyle = colors.original;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(i.x, i.y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(j.x, j.y);
+            ctx.stroke();
+
+            // Draw transformed vectors
+            const angle = time * 0.5;
+            const transformedI = project(Math.cos(angle), Math.sin(angle), 0);
+            const transformedJ = project(-Math.sin(angle), Math.cos(angle), 0);
+
+            ctx.strokeStyle = colors.transformed;
+            ctx.beginPath();
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(transformedI.x, transformedI.y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(transformedJ.x, transformedJ.y);
+            ctx.stroke();
+
+            explanation.innerHTML = `
+                Linear Transformation View:<br>
+                • Shows how vectors are transformed<br>
+                • Basis vectors (i,j) get mapped to new positions<br>
+                • The transformation matrix is the Jacobian matrix<br>
+                • The derivative at a point is a linear transformation
+            `;
+        }
+
+        function drawDerivativeApproximation() {
+            const f = x => Math.sin(x);
+            const df = x => Math.cos(x);
+            
+            // Draw original function
+            ctx.beginPath();
+            ctx.strokeStyle = colors.original;
+            ctx.lineWidth = 2;
+            
+            for(let x = -3; x <= 3; x += 0.1) {
+                const p = project(x, f(x), 0);
+                if(x === -3) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            }
+            ctx.stroke();
+
+            // Draw linear approximation at x0
+            const x0 = Math.cos(time);
+            const y0 = f(x0);
+            const slope = df(x0);
+
+            ctx.beginPath();
+            ctx.strokeStyle = colors.transformed;
+            
+            for(let x = x0-1; x <= x0+1; x += 0.1) {
+                const y = y0 + slope * (x - x0);
+                const p = project(x, y, 0);
+                if(x === x0-1) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            }
+            ctx.stroke();
+
+            explanation.innerHTML = `
+                Derivative as Linear Approximation:<br>
+                • Blue curve: original function f(x) = sin(x)<br>
+                • Red line: linear approximation at a point<br>
+                • The derivative gives the best linear approximation<br>
+                • This is why derivatives can be viewed as linear transformations
+            `;
+        }
+
+        function drawJacobianVisualization() {
+            // Draw coordinate grid transformation
+            const gridSize = 2;
+            const step = 0.5;
+
+            for(let x = -gridSize; x <= gridSize; x += step) {
+                for(let y = -gridSize; y <= gridSize; y += step) {
+                    // Original point
+                    const p1 = project(x, y, 0);
+                    
+                    // Transformed point using a nonlinear transformation
+                    const newX = x * Math.cos(time) - y * Math.sin(time);
+                    const newY = x * Math.sin(time) + y * Math.cos(time);
+                    const p2 = project(newX, newY, 0);
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = colors.vector;
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            }
+
+            explanation.innerHTML = `
+                Jacobian Matrix Visualization:<br>
+                • Green arrows show how points move under transformation<br>
+                • The Jacobian matrix gives the local linear approximation<br>
+                • It shows how small changes in input affect output<br>
+                • This connects derivatives to linear transformations
+            `;
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+            drawAxes();
+
+            switch(currentMode) {
+                case 1:
+                    drawLinearTransformation();
+                    break;
+                case 2:
+                    drawDerivativeApproximation();
+                    break;
+                case 3:
+                    drawJacobianVisualization();
+                    break;
+            }
+        }
+
+        function animate() {
+            if(isAnimating) {
+                time += 0.02;
+                draw();
+                requestAnimationFrame(animate);
+            }
+        }
+
+        // Event handlers
+        canvas.addEventListener('mousedown', e => {
+            isDragging = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if(isDragging) {
+                const deltaX = e.clientX - lastMouseX;
+                const deltaY = e.clientY - lastMouseY;
+                rotationY += deltaX * 0.01;
+                rotationX += deltaY * 0.01;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                draw();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        document.addEventListener('keydown', e => {
+            switch(e.key) {
+                case '1':
+                    currentMode = 1;
+                    break;
+                case '2':
+                    currentMode = 2;
+                    break;
+                case '3':
+                    currentMode = 3;
+                    break;
+                case ' ':
+                    isAnimating = !isAnimating;
+                    if(isAnimating) animate();
+                    break;
+            }
+            draw();
+        });
+
+        animate();
+    </script>
+</body>
+</html>

@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<!--
+code source 
+https://github.com/shadanan/matvis
+
+-->
+
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Linear Transformation Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #121212;
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .panel {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        canvas {
+            width: 100%;
+            height: 640px;
+            background: black;
+            margin-bottom: 20px;
+        }
+
+        canvas:active {
+            cursor: none;
+        }
+
+        .matrix-display {
+            font-family: monospace;
+            font-size: 20px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .matrix-bracket {
+            font-size: 40px;
+            color: white;
+        }
+
+        h4 {
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        ul {
+            color: #ccc;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h4>
+            <a href="https://youtu.be/kYB8IZa5AuE" style="color: #4CAF50; text-decoration: none;">
+                Linear Transformation Visualizer - Inspired by 3Blue1Brown
+            </a>
+        </h4>
+
+        <div class="panel">
+            <canvas id="matvis"></canvas>
+
+            <div class="controls">
+                <div class="slider-container">
+                    <label>t: <span id="t-value">0</span></label>
+                    <input type="range" id="t-slider" min="0" max="1" step="0.01" value="0">
+                </div>
+
+                <div class="checkbox-container">
+                    <input type="checkbox" id="inout-vector">
+                    <label for="inout-vector">Show In/Out Vector</label>
+                </div>
+
+                <div class="checkbox-container">
+                    <input type="checkbox" id="determinant">
+                    <label for="determinant">Show Determinant</label>
+                </div>
+
+                <div class="checkbox-container">
+                    <input type="checkbox" id="eigenvectors">
+                    <label for="eigenvectors">Show Eigenvectors</label>
+                </div>
+
+                <div class="checkbox-container">
+                    <input type="checkbox" id="snap-grid">
+                    <label for="snap-grid">Snap to Grid</label>
+                </div>
+            </div>
+        </div>
+
+        <h4>Instructions</h4>
+        <ul>
+            <li>Drag the green and red targets to set in the transformed basis vectors.</li>
+            <li>Drag the t slider to visualize the transformation.</li>
+            <li>Enable the In/Out Vector to show a vector and its corresponding visualization.</li>
+            <li>Enable the Determinant to show the determinant in the visualization.</li>
+            <li>Enable the Eigenvectors to show the eigenvectors in the visualization.</li>
+        </ul>
+    </div>
+
+    <script>
+        const EPSILON = 0.05;
+        let state = {
+            a: 3, c: 0,
+            b: 1, d: 2,
+            x: 1, y: 1,
+            currentCrossHair: 0,
+            t: 0,
+            inoutVector: true,
+            determinant: false,
+            eigenvectors: false,
+            snapToGrid: false, //?? 뭘 나타내려는 건지 모르겠음 
+            scale: 60
+        };
+
+        // Drawing utilities
+        function arrow(ctx, x1, y1, x2, y2, s) {
+            let a = Math.atan2(y2 - y1, x2 - x1);
+
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2-0.8*s*Math.cos(a), y2-0.8*s*Math.sin(a));
+            ctx.lineTo(x2-s*Math.cos(a-Math.PI/7), y2-s*Math.sin(a-Math.PI/7));
+            ctx.lineTo(x2, y2);
+            ctx.lineTo(x2-s*Math.cos(a+Math.PI/7), y2-s*Math.sin(a+Math.PI/7));
+            ctx.lineTo(x2-0.8*s*Math.cos(a), y2-0.8*s*Math.sin(a));
+            ctx.closePath();
+            ctx.stroke();
+            ctx.fill();
+        }
+
+        function crosshair(ctx, x, y, s) {
+            ctx.beginPath();
+            ctx.arc(x, y, s, 0, 2 * Math.PI, false);
+            ctx.moveTo(x, y + (s / 2));
+            ctx.lineTo(x, y + (s * 3 / 2));
+            ctx.moveTo(x, y - (s / 2));
+            ctx.lineTo(x, y - (s * 3 / 2));
+            ctx.moveTo(x + (s / 2), y);
+            ctx.lineTo(x + (s * 3 / 2), y);
+            ctx.moveTo(x - (s / 2), y);
+            ctx.lineTo(x - (s * 3 / 2), y);
+            ctx.stroke();
+        }
+
+        // Canvas utilities
+        function getMousePos(canvas, event) {
+            let rect = canvas.getBoundingClientRect();
+            let xRatio = state.scale * rect.width / canvas.width;
+            let yRatio = -state.scale * rect.height / canvas.height;
+
+            let x = ((event.clientX - rect.left) - rect.width / 2) / xRatio;
+            let y = ((event.clientY - rect.top) - rect.height / 2) / yRatio;
+            return {x, y};
+        }
+
+        // Event handlers
+        function handleMouseDown(event) {
+            let canvas = document.getElementById('matvis');
+            let mousePosition = getMousePos(canvas, event);
+            
+            let d1 = numeric.norm2(numeric.sub(
+                [mousePosition.x, mousePosition.y], [state.a, state.c]));
+            let d2 = numeric.norm2(numeric.sub(
+                [mousePosition.x, mousePosition.y], [state.b, state.d]));
+            let d3 = numeric.norm2(numeric.sub(
+                [mousePosition.x, mousePosition.y], [state.x, state.y]));
+
+            if (Math.min(d1, d2, d3) == d1) {
+                state.currentCrossHair = 1;
+            } else if (Math.min(d1, d2, d3) == d2) {
+                state.currentCrossHair = 2;
+            } else if (Math.min(d1, d2, d3) == d3) {
+                state.currentCrossHair = 3;
+            }
+
+            handleMouseMove(event);
+        }
+
+        function handleMouseUp() {
+            state.currentCrossHair = 0;
+        }
+
+        function handleMouseMove(event) {
+            if (state.currentCrossHair != 0) {
+                let canvas = document.getElementById('matvis');
+                let mousePosition = getMousePos(canvas, event);
+
+                if (state.snapToGrid) {
+                    let xSnap = Math.round(mousePosition.x * 2) / 2;
+                    let ySnap = Math.round(mousePosition.y * 2) / 2;
+
+                    if (Math.abs(xSnap - mousePosition.x) < EPSILON) {
+                        mousePosition.x = xSnap;
+                    }
+                    if (Math.abs(ySnap - mousePosition.y) < EPSILON) {
+                        mousePosition.y = ySnap;
+                    }
+                }
+
+                if (state.currentCrossHair == 1) {
+                    state.a = mousePosition.x;
+                    state.c = mousePosition.y;
+                } else if (state.currentCrossHair == 2) {
+                    state.b = mousePosition.x;
+                    state.d = mousePosition.y;
+                } else if (state.currentCrossHair == 3) {
+                    state.x = mousePosition.x;
+                    state.y = mousePosition.y;
+                }
+
+                updateCanvas();
+            }
+        }
+
+        // Main drawing function
+        function updateCanvas() {
+            let canvas = document.getElementById('matvis');
+            let ctx = canvas.getContext('2d');
+
+            // Clear canvas
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(state.scale, -state.scale);
+
+            // Current transformation matrix
+            let m = [
+                [
+                    (1 - state.t) + state.t * state.a,
+                    state.t * state.b
+                ],
+                [
+                    state.t * state.c,
+                    (1 - state.t) + state.t * state.d
+                ]
+            ];
+
+            // Draw grid
+            drawGrid(ctx, m);
+            
+            // Draw vectors and other elements
+            drawVectors(ctx, m);
+            
+            // Draw determinant if enabled
+            if (state.determinant) {
+                drawDeterminant(ctx, m);
+            }
+            
+            // Draw eigenvectors if enabled
+            if (state.eigenvectors && state.t > 0) {
+                drawEigenvectors(ctx, m);
+            }
+
+            ctx.restore();
+
+            // Draw matrix display
+            drawMatrixDisplay(ctx);
+        }
+
+        // Initialize
+        function init() {
+            let canvas = document.getElementById('matvis');
+            canvas.width = 1140;
+            canvas.height = 640;
+
+            // Add event listeners
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('mouseleave', handleMouseUp);
+
+            // Add touch support
+            canvas.addEventListener('touchstart', function(e) {
+                let touch = e.touches[0];
+                let mouseEvent = new MouseEvent('mousedown', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                handleMouseDown(mouseEvent);
+            });
+
+            // Add control event listeners
+            document.getElementById('t-slider').addEventListener('input', function(e) {
+                state.t = parseFloat(e.target.value);
+                document.getElementById('t-value').textContent = state.t.toFixed(2);
+                updateCanvas();
+            });
+
+            ['inout-vector', 'determinant', 'eigenvectors', 'snap-grid'].forEach(id => {
+                document.getElementById(id).addEventListener('change', function(e) {
+                    // state[e.target.id.replace(/-/g, '')] = e.target.checked;
+                    // updateCanvas();
+
+                    // Convert checkbox id to state property name
+                    const stateProp = id.replace(/-/g, ''); // Replace all dashes with empty string
+                    state[stateProp] = e.target.checked;
+                    updateCanvas();
+                });
+            });
+
+            // Initial render
+            updateCanvas();
+        }
+
+        //Add these functions before the init() function
+
+        // Helper functions for drawing
+
+        function drawGrid(ctx, m) {
+            ctx.lineWidth = 0.02;
+
+            // Minor Grid Lines
+            ctx.strokeStyle = '#212121';
+            for (let i = -19.5; i <= 19.5; i++) {
+                ctx.beginPath();
+                ctx.moveTo(-20, i);
+                ctx.lineTo(20, i);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(i, -20);
+                ctx.lineTo(i, 20);
+                ctx.stroke();
+            }
+
+            // Major Grid Lines
+            ctx.strokeStyle = '#606060';
+            for (let i = -20; i <= 20; i++) {
+                ctx.beginPath();
+                ctx.moveTo(-20, i);
+                ctx.lineTo(20, i);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(i, -20);
+                ctx.lineTo(i, 20);
+                ctx.stroke();
+            }
+
+            // Transformed Grid Lines
+            ctx.strokeStyle = '#1fabc3';
+            for (let i = -20; i <= 20; i++) {
+                // Vertical lines
+                let startV = numeric.dot(m, [-20, i]);
+                let endV = numeric.dot(m, [20, i]);
+                ctx.beginPath();
+                ctx.moveTo(startV[0], startV[1]);
+                ctx.lineTo(endV[0], endV[1]);
+                ctx.stroke();
+
+                // Horizontal lines
+                let startH = numeric.dot(m, [i, -20]);
+                let endH = numeric.dot(m, [i, 20]);
+                ctx.beginPath();
+                ctx.moveTo(startH[0], startH[1]);
+                ctx.lineTo(endH[0], endH[1]);
+                ctx.stroke();
+            }
+
+            // Primary Axes
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 0.04;
+            
+            // X-axis
+            let xStart = numeric.dot(m, [-20, 0]);
+            let xEnd = numeric.dot(m, [20, 0]);
+            ctx.beginPath();
+            ctx.moveTo(xStart[0], xStart[1]);
+            ctx.lineTo(xEnd[0], xEnd[1]);
+            ctx.stroke();
+
+            // Y-axis
+            let yStart = numeric.dot(m, [0, -20]);
+            let yEnd = numeric.dot(m, [0, 20]);
+            ctx.beginPath();
+            ctx.moveTo(yStart[0], yStart[1]);
+            ctx.lineTo(yEnd[0], yEnd[1]);
+            ctx.stroke();
+        }
+        function drawVectors(ctx, m) {
+            // Draw basis vectors
+            // iHat (transformed x unit vector)
+            ctx.strokeStyle = '#8cbe63';
+            ctx.fillStyle = '#8cbe63';
+            let iHat = numeric.dot(m, [1, 0]);
+            arrow(ctx, 0, 0, iHat[0], iHat[1], 0.2);
+
+            // jHat (transformed y unit vector)
+            ctx.strokeStyle = '#ff7c5c';
+            ctx.fillStyle = '#ff7c5c';
+            let jHat = numeric.dot(m, [0, 1]);
+            arrow(ctx, 0, 0, jHat[0], jHat[1], 0.2);
+
+            // Draw input/output vector if enabled
+            if (state.inoutVector) {
+                // Draw original vector in yellow
+                ctx.strokeStyle = '#fdfe00';
+                ctx.fillStyle = '#fdfe00';
+                arrow(ctx, 0, 0, state.x, state.y, 0.2);
+                
+                // Draw transformed vector in brighter yellow
+                let transformedVector = numeric.dot(m, [state.x, state.y]);
+                ctx.strokeStyle = '#ffff00';
+                ctx.fillStyle = '#ffff00';
+                arrow(ctx, 0, 0, transformedVector[0], transformedVector[1], 0.2);
+                
+                // Draw input vector crosshair
+                crosshair(ctx, state.x, state.y, 0.16);
+            }
+
+            // Draw crosshairs for basis vectors
+            ctx.strokeStyle = '#8cbe63';
+            ctx.fillStyle = '#8cbe63';
+            crosshair(ctx, state.a, state.c, 0.16);
+
+            ctx.strokeStyle = '#ff7c5c';
+            ctx.fillStyle = '#ff7c5c';
+            crosshair(ctx, state.b, state.d, 0.16);
+        }
+
+        function drawDeterminant(ctx, m) {
+            const det = numeric.det(m);
+            const color = det < 0 ? '#fd00fe' : '#fdfe00';
+            const fillColor = det < 0 ? 'rgba(253, 0, 254, 0.5)' : 'rgba(253, 254, 0, 0.5)';
+            
+            ctx.strokeStyle = color;
+            ctx.fillStyle = fillColor;
+
+            // Draw parallelogram
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            let v1 = numeric.dot(m, [1, 0]);
+            let v2 = numeric.dot(m, [0, 1]);
+            let sum = numeric.dot(m, [1, 1]);
+            ctx.lineTo(v1[0], v1[1]);
+            ctx.lineTo(sum[0], sum[1]);
+            ctx.lineTo(v2[0], v2[1]);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.fill();
+        }
+
+        function drawEigenvectors(ctx, m) {
+            let evs = numeric.eig(m);
+
+            // Only show real eigenvectors
+            if (evs.E.y === undefined) {
+                ctx.strokeStyle = '#ffc181';
+                ctx.fillStyle = '#ffc181';
+                ctx.lineWidth = 0.01;
+
+                for (let i = 0; i < 2; i++) {
+                    let eigenvalue = evs.lambda.x[i];
+                    let eigenvector = [evs.E.x[0][i], evs.E.x[1][i]];
+                    
+                    // Normalize eigenvector
+                    let length = Math.sqrt(eigenvector[0] * eigenvector[0] + eigenvector[1] * eigenvector[1]);
+                    eigenvector = [eigenvector[0] / length, eigenvector[1] / length];
+
+                    // Draw eigenvector lines
+                    for (let scale = -20; scale <= 20; scale++) {
+                        if (scale === 0) continue;
+                        let scaled = [scale * eigenvector[0], scale * eigenvector[1]];
+                        arrow(ctx, 0, 0, scaled[0], scaled[1], 0.2);
+                    }
+
+                    // Draw transformed eigenvector
+                    let transformed = numeric.dot(m, eigenvector);
+                    arrow(ctx, 0, 0, eigenvalue * eigenvector[0], eigenvalue * eigenvector[1], 0.2);
+                }
+            }
+        }
+
+        function drawMatrixDisplay(ctx) {
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#ffffff';
+            ctx.font = "20pt serif";
+
+            // Draw matrix brackets - updated to draw proper closing bracket
+            function drawBracket(x, height, isClosing = false) {
+                ctx.beginPath();
+                if (isClosing) {
+                    ctx.moveTo(x - 5, 10);
+                    ctx.lineTo(x, 10);
+                    ctx.lineTo(x, height);
+                    ctx.lineTo(x - 5, height);
+                } else {
+                    ctx.moveTo(x + 5, 10);
+                    ctx.lineTo(x, 10);
+                    ctx.lineTo(x, height);
+                    ctx.lineTo(x + 5, height);
+                }
+                ctx.stroke();
+            }
+
+            // Left matrix brackets
+            drawBracket(10, 80);
+            drawBracket(160, 80, true);  // Closing bracket
+
+            // Vector brackets
+            drawBracket(170, 80);
+            drawBracket(240, 80, true);  // Closing bracket
+
+            // Result brackets
+            drawBracket(275, 80);
+            drawBracket(345, 80, true);  // Closing bracket
+
+
+            // Draw matrix values
+            // First column (green)
+            ctx.fillStyle = '#8cbe63';
+            ctx.fillText(state.a.toFixed(2), 20, 35);
+            ctx.fillText(state.c.toFixed(2), 20, 75);
+
+            // Second column (red)
+            ctx.fillStyle = '#ff7c5c';
+            ctx.fillText(state.b.toFixed(2), 90, 35);
+            ctx.fillText(state.d.toFixed(2), 90, 75);
+
+            // Input vector (yellow)
+            ctx.fillStyle = '#fdfe00';
+            ctx.fillText(state.x.toFixed(2), 180, 35);
+            ctx.fillText(state.y.toFixed(2), 180, 75);
+
+            // Equals sign
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText("=", 250, 50);
+
+            // Result vector
+            let result = numeric.dot([
+                [state.a, state.b],
+                [state.c, state.d]
+            ], [state.x, state.y]);
+            ctx.fillText(result[0].toFixed(2), 285, 35);
+            ctx.fillText(result[1].toFixed(2), 285, 75);
+        }
+
+        // Start the application when the page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            background: black;
+            color: white;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        canvas { display: block; }
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 350px;
+        }
+        #matrix {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            width: 600px;
+        }
+        .slider {
+            width: 80%;
+            margin: 10px;
+        }
+        button {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        button:hover {
+            background: #555;
+        }
+        .toggle-btn {
+            background: #333;
+            margin: 5px;
+        }
+        .toggle-btn.active {
+            background: #666;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="info">
+        Matrix A = [a b; c d]<br><br>
+        Purple: Eigenvectors<br>
+        • e₁ scaling by λ₁<br>
+        • e₂ scaling by λ₂<br><br>
+        Yellow: Test vector<br>
+        (changes direction)<br><br>
+        Green: Transformed grid<br><br>
+        Notice: Eigenvectors maintain<br>
+        direction, only change length!
+    </div>
+    <div id="matrix">Matrix & Eigenvalues</div>
+    <div id="controls">
+        <div>Matrix Values:</div>
+        <div>a: <span id="a-value"></span></div>
+        <input type="range" id="a-slider" class="slider" min="-200" max="200" value="100">
+        <div>b: <span id="b-value"></span></div>
+        <input type="range" id="b-slider" class="slider" min="-200" max="200" value="0">
+        <div>c: <span id="c-value"></span></div>
+        <input type="range" id="c-slider" class="slider" min="-200" max="200" value="0">
+        <div>d: <span id="d-value"></span></div>
+        <input type="range" id="d-slider" class="slider" min="-200" max="200" value="100">
+        <br>
+        <button id="animate-btn">Animate Transform</button>
+        <button id="reset-btn">Reset</button>
+        <button id="toggle-vectors" class="toggle-btn active">Test Vectors</button>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const matrixDiv = document.getElementById('matrix');
+        const aSlider = document.getElementById('a-slider');
+        const bSlider = document.getElementById('b-slider');
+        const cSlider = document.getElementById('c-slider');
+        const dSlider = document.getElementById('d-slider');
+        const aValue = document.getElementById('a-value');
+        const bValue = document.getElementById('b-value');
+        const cValue = document.getElementById('c-value');
+        const dValue = document.getElementById('d-value');
+        const animateBtn = document.getElementById('animate-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const toggleVectors = document.getElementById('toggle-vectors');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let isAnimating = false;
+        let animationProgress = 0;
+        let showVectors = true;
+
+        // Test vectors to show non-eigenvector behavior
+        let testVectors = [
+            {x: 1, y: 0},
+            {x: 0, y: 1},
+            {x: 1, y: 0.5}
+        ];
+
+        let currentMatrix = {
+            a: 1, b: 0,
+            c: 0, d: 1
+        };
+
+        function calculateEigenvalues(matrix) {
+            // Characteristic equation: λ² - tr(A)λ + det(A) = 0
+            const trace = matrix.a + matrix.d;
+            const det = matrix.a * matrix.d - matrix.b * matrix.c;
+            
+            // Quadratic formula
+            const discriminant = Math.sqrt(trace * trace - 4 * det);
+            return {
+                λ1: (trace + discriminant) / 2,
+                λ2: (trace - discriminant) / 2
+            };
+        }
+
+        function calculateEigenvectors(matrix, eigenvalues) {
+            // For each eigenvalue λ, solve (A - λI)v = 0
+            const eigenvectors = [];
+            
+            for (const λ of [eigenvalues.λ1, eigenvalues.λ2]) {
+                // Try standard approach first
+                let x = matrix.b;
+                let y = λ - matrix.a;
+                
+                // If this gives zero vector, try the other equation
+                if (Math.abs(x) < 1e-10 && Math.abs(y) < 1e-10) {
+                    x = λ - matrix.d;
+                    y = matrix.c;
+                }
+                
+                // Normalize the vector
+                const length = Math.sqrt(x * x + y * y);
+                eigenvectors.push({
+                    x: x / length,
+                    y: y / length
+                });
+            }
+            
+            return eigenvectors;
+        }
+
+        function transformVector(vec, matrix) {
+            return {
+                x: matrix.a * vec.x + matrix.b * vec.y,
+                y: matrix.c * vec.x + matrix.d * vec.y
+            };
+        }
+
+        function toScreen(x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 8;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2 - y * scale
+            };
+        }
+
+        function fromScreen(x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 8;
+            return {
+                x: (x - canvas.width/2) / scale,
+                y: -(y - canvas.height/2) / scale
+            };
+        }
+
+        function drawGrid(matrix = null) {
+            const gridSize = 5;
+            const step = 1;
+            
+            ctx.lineWidth = 1;
+            
+            for(let i = -gridSize; i <= gridSize; i += step) {
+                if (!matrix) {
+                    ctx.strokeStyle = '#333';
+                    
+                    let start = toScreen(i, -gridSize);
+                    let end = toScreen(i, gridSize);
+                    ctx.beginPath();
+                    ctx.moveTo(start.x, start.y);
+                    ctx.lineTo(end.x, end.y);
+                    ctx.stroke();
+
+                    start = toScreen(-gridSize, i);
+                    end = toScreen(gridSize, i);
+                    ctx.beginPath();
+                    ctx.moveTo(start.x, start.y);
+                    ctx.lineTo(end.x, end.y);
+                    ctx.stroke();
+                } else {
+                    ctx.strokeStyle = '#1a3333';
+                    
+                    for(let j = -gridSize; j <= gridSize; j += step) {
+                        // Transform grid points
+                        const p1 = transformVector({x: i, y: j}, matrix);
+                        const p2 = transformVector({x: i+step, y: j}, matrix);
+                        const p3 = transformVector({x: i, y: j+step}, matrix);
+                        
+                        let start = toScreen(p1.x, p1.y);
+                        let end = toScreen(p2.x, p2.y);
+                        ctx.beginPath();
+                        ctx.moveTo(start.x, start.y);
+                        ctx.lineTo(end.x, end.y);
+                        ctx.stroke();
+
+                        start = toScreen(p1.x, p1.y);
+                        end = toScreen(p3.x, p3.y);
+                        ctx.beginPath();
+                        ctx.moveTo(start.x, start.y);
+                        ctx.lineTo(end.x, end.y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        function drawVector(vec, color = '#ffff00', width = 2, label = '', start = {x: 0, y: 0}) {
+            const startPoint = toScreen(start.x, start.y);
+            const endPoint = toScreen(start.x + vec.x, start.y + vec.y);
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(startPoint.x, startPoint.y);
+            ctx.lineTo(endPoint.x, endPoint.y);
+            ctx.stroke();
+
+            // Arrow head
+            const angle = Math.atan2(endPoint.y - startPoint.y, endPoint.x - startPoint.x);
+            ctx.beginPath();
+            ctx.moveTo(endPoint.x, endPoint.y);
+            ctx.lineTo(
+                endPoint.x - 15 * Math.cos(angle - Math.PI/6),
+                endPoint.y - 15 * Math.sin(angle - Math.PI/6)
+            );
+            ctx.lineTo(
+                endPoint.x - 15 * Math.cos(angle + Math.PI/6),
+                endPoint.y - 15 * Math.sin(angle + Math.PI/6)
+            );
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            if(label) {
+                ctx.fillStyle = color;
+                ctx.font = '16px monospace';
+                ctx.fillText(label, endPoint.x + 10, endPoint.y);
+            }
+        }
+
+        function updateInfo() {
+            const eigenvalues = calculateEigenvalues(currentMatrix);
+            const eigenvectors = calculateEigenvectors(currentMatrix, eigenvalues);
+            
+            matrixDiv.innerHTML = `
+                Matrix:<br>
+                [${currentMatrix.a.toFixed(2)} ${currentMatrix.b.toFixed(2)}]<br>
+                [${currentMatrix.c.toFixed(2)} ${currentMatrix.d.toFixed(2)}]<br><br>
+                Eigenvalues:<br>
+                λ₁ = ${eigenvalues.λ1.toFixed(2)}<br>
+                λ₂ = ${eigenvalues.λ2.toFixed(2)}
+            `;
+
+            aValue.textContent = (currentMatrix.a).toFixed(2);
+            bValue.textContent = (currentMatrix.b).toFixed(2);
+            cValue.textContent = (currentMatrix.c).toFixed(2);
+            dValue.textContent = (currentMatrix.d).toFixed(2);
+
+            return { eigenvalues, eigenvectors };
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grids
+            drawGrid();
+            drawGrid(currentMatrix);
+
+            // Calculate eigenvalues and eigenvectors
+            const { eigenvalues, eigenvectors } = updateInfo();
+
+            // Draw eigenvectors
+            eigenvectors.forEach((vec, i) => {
+                // Draw original eigenvector
+                drawVector(vec, '#ff44ff', 2, `e${i+1}`);
+                
+                // Draw transformed eigenvector
+                const transformed = transformVector(vec, currentMatrix);
+                drawVector(transformed, '#ff44ff', 2, `λ${i+1}e${i+1}`);
+
+                // Draw scaling line
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = '#ff44ff';
+                ctx.beginPath();
+                ctx.moveTo(...Object.values(toScreen(vec.x, vec.y)));
+                ctx.lineTo(...Object.values(toScreen(transformed.x, transformed.y)));
+                ctx.stroke();
+                ctx.setLineDash([]);
+            });
+
+            if (showVectors) {
+                // Draw test vectors
+                testVectors.forEach(vec => {
+                    drawVector(vec, '#ffff00', 1);
+                    const transformed = transformVector(vec, currentMatrix);
+                    drawVector(transformed, '#ffff00', 2);
+
+                    // Draw transformation path
+                    ctx.setLineDash([2, 2]);
+                    ctx.strokeStyle = '#ffff00';
+                    ctx.beginPath();
+                    ctx.moveTo(...Object.values(toScreen(vec.x, vec.y)));
+                    ctx.lineTo(...Object.values(toScreen(transformed.x, transformed.y)));
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                });
+            }
+        }
+
+        function updateMatrixFromSliders() {
+            currentMatrix = {
+                a: aSlider.value / 100,
+                b: bSlider.value / 100,
+                c: cSlider.value / 100,
+                d: dSlider.value / 100
+            };
+            draw();
+        }
+
+        function animateTransform() {
+        if (!isAnimating) {
+            isAnimating = true;
+            animateBtn.textContent = 'Stop Animation';
+            
+            // Target matrix for interesting eigenvector behavior
+            const targetMatrix = {
+                a: 2, b: 1,
+                c: 1, d: 2
+            };
+
+            function animate() {
+                if (isAnimating) {
+                    animationProgress += 0.01;
+                    
+                    if (animationProgress <= 1) {
+                        // Interpolate matrix values
+                        currentMatrix = {
+                            a: 1 + (targetMatrix.a - 1) * animationProgress,
+                            b: targetMatrix.b * animationProgress,
+                            c: targetMatrix.c * animationProgress,
+                            d: 1 + (targetMatrix.d - 1) * animationProgress
+                        };
+                        
+                        // Update sliders
+                        aSlider.value = currentMatrix.a * 100;
+                        bSlider.value = currentMatrix.b * 100;
+                        cSlider.value = currentMatrix.c * 100;
+                        dSlider.value = currentMatrix.d * 100;
+
+                        draw();
+                        requestAnimationFrame(animate);
+                    } else {
+                        // Reset animation
+                        animationProgress = 0;
+                        isAnimating = false;
+                        animateBtn.textContent = 'Animate Transform';
+                    }
+                }
+            }
+            
+            animate();
+        } else {
+            isAnimating = false;
+            animateBtn.textContent = 'Animate Transform';
+        }
+    }
+
+    // Event listeners
+    aSlider.addEventListener('input', updateMatrixFromSliders);
+    bSlider.addEventListener('input', updateMatrixFromSliders);
+    cSlider.addEventListener('input', updateMatrixFromSliders);
+    dSlider.addEventListener('input', updateMatrixFromSliders);
+
+    animateBtn.addEventListener('click', animateTransform);
+
+    resetBtn.addEventListener('click', () => {
+        isAnimating = false;
+        animationProgress = 0;
+        animateBtn.textContent = 'Animate Transform';
+        
+        // Reset matrix to identity
+        currentMatrix = {
+            a: 1, b: 0,
+            c: 0, d: 1
+        };
+        
+        // Reset sliders
+        aSlider.value = 100;
+        bSlider.value = 0;
+        cSlider.value = 0;
+        dSlider.value = 100;
+        
+        draw();
+    });
+
+    toggleVectors.addEventListener('click', () => {
+        showVectors = !showVectors;
+        toggleVectors.classList.toggle('active');
+        draw();
+    });
+
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        draw();
+    });
+
+    // Initialize the visualization
+    draw();
+</script>
+</body>
+</html>

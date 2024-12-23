@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="description" content="Coding Math 49 Canvas">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>JS Bin</title>
+  <style>
+    html, body {
+  margin: 0;
+  padding: 0;
+}
+
+canvas {
+  display: block;
+}
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <script>
+    var canvas = document.getElementById("canvas"),
+    context = canvas.getContext("2d"),
+    width = canvas.width = window.innerWidth,
+    height = canvas.height = window.innerHeight;
+
+var angle = Math.PI / 4,
+    cos = Math.cos(angle),
+    sin = Math.sin(angle),
+    sx = 0.5,
+    sy = 1;
+
+context.setTransform(cos * sx, sin * sx, -sin * sy, cos * sy, 200, 300);
+context.fillRect(0, 0, 100, 100);
+
+
+  </script>
+</body>
+</html>

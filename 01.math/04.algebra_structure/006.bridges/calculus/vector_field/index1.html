@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { 
+            margin: 0; 
+            background: #1a1a1a;
+            color: white;
+            font-family: system-ui, sans-serif;
+            padding: 20px;
+        }
+        canvas { 
+            background: black;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .controls {
+            margin: 10px 0;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="controls">
+        Press 1: Show y = e^x (fits the field)<br>
+        Press 2: Show y = x² + 1 (doesn't fit)<br>
+        Press 3: Show y = 2e^x (fits the field)<br>
+        Press 4: Show y = x² - 1 (doesn't fit)<br>
+        Space: Toggle vector field
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = Math.min(800, window.innerWidth - 40);
+        canvas.height = 400;
+
+        let showVectorField = true;
+        let currentFunction = 1;
+
+        const colors = {
+            grid: '#333',
+            axis: '#666',
+            vector: '#00ff8866',
+            function: '#ff3366',
+            tangent: '#ffff00'
+        };
+
+        function toCanvasX(x) {
+            return (x + 4) * (canvas.width / 8);
+        }
+
+        function toCanvasY(y) {
+            return canvas.height - (y + 2) * (canvas.height / 4);
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = colors.grid;
+            ctx.lineWidth = 0.5;
+            
+            for(let x = -4; x <= 4; x++) {
+                ctx.beginPath();
+                ctx.moveTo(toCanvasX(x), 0);
+                ctx.lineTo(toCanvasX(x), canvas.height);
+                ctx.stroke();
+            }
+            
+            for(let y = -2; y <= 2; y++) {
+                ctx.beginPath();
+                ctx.moveTo(0, toCanvasY(y));
+                ctx.lineTo(canvas.width, toCanvasY(y));
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = colors.axis;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, toCanvasY(0));
+            ctx.lineTo(canvas.width, toCanvasY(0));
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(0), 0);
+            ctx.lineTo(toCanvasX(0), canvas.height);
+            ctx.stroke();
+        }
+
+        function drawVectorField() {
+            const spacing = 0.5;
+            
+            for(let x = -4; x <= 4; x += spacing) {
+                for(let y = -2; y <= 2; y += spacing) {
+                    const slope = y;  // dy/dx = y
+                    const length = 0.2;
+                    const angle = Math.atan2(slope, 1);
+                    
+                    const startX = toCanvasX(x);
+                    const startY = toCanvasY(y);
+                    const endX = startX + length * Math.cos(angle) * 40;
+                    const endY = startY - length * Math.sin(angle) * 40;
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = colors.vector;
+                    ctx.lineWidth = 1;
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawFunction(fn, derivFn) {
+            // Draw function
+            ctx.beginPath();
+            ctx.strokeStyle = colors.function;
+            ctx.lineWidth = 2;
+
+            for(let x = -4; x <= 4; x += 0.1) {
+                const y = fn(x);
+                if(y >= -2 && y <= 2) {
+                    const canvasX = toCanvasX(x);
+                    const canvasY = toCanvasY(y);
+                    if(x === -4) ctx.moveTo(canvasX, canvasY);
+                    else ctx.lineTo(canvasX, canvasY);
+                }
+            }
+            ctx.stroke();
+
+            // Draw tangent lines at sample points
+            for(let x = -3; x <= 3; x++) {
+                const y = fn(x);
+                if(y >= -2 && y <= 2) {
+                    const slope = derivFn(x);
+                    const length = 0.5;
+                    
+                    const startX = toCanvasX(x - length/2);
+                    const startY = toCanvasY(y - slope*length/2);
+                    const endX = toCanvasX(x + length/2);
+                    const endY = toCanvasY(y + slope*length/2);
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = colors.tangent;
+                    ctx.lineWidth = 2;
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+            if(showVectorField) drawVectorField();
+
+            switch(currentFunction) {
+                case 1:
+                    // y = e^x
+                    drawFunction(
+                        x => Math.exp(x),
+                        x => Math.exp(x)
+                    );
+                    break;
+                case 2:
+                    // y = x² + 1
+                    drawFunction(
+                        x => x*x + 1,
+                        x => 2*x
+                    );
+                    break;
+                case 3:
+                    // y = 2e^x
+                    drawFunction(
+                        x => 2 * Math.exp(x),
+                        x => 2 * Math.exp(x)
+                    );
+                    break;
+                case 4:
+                    // y = x² - 1
+                    drawFunction(
+                        x => x*x - 1,
+                        x => 2*x
+                    );
+                    break;
+            }
+        }
+
+        document.addEventListener('keydown', e => {
+            switch(e.key) {
+                case '1':
+                    currentFunction = 1;
+                    break;
+                case '2':
+                    currentFunction = 2;
+                    break;
+                case '3':
+                    currentFunction = 3;
+                    break;
+                case '4':
+                    currentFunction = 4;
+                    break;
+                case ' ':
+                    showVectorField = !showVectorField;
+                    break;
+            }
+            draw();
+        });
+
+        draw();
+    </script>
+</body>
+</html>

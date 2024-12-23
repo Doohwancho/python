@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { 
+            margin: 0; 
+            display: flex;
+            background: #1a1a1a;
+            color: white;
+            font-family: system-ui, sans-serif;
+        }
+        .container {
+            padding: 20px;
+            width: 100%;
+        }
+        canvas { 
+            background: black;
+            border-radius: 8px;
+        }
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .explanation {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="canvas"></canvas>
+        <div class="controls">
+            Press 1: Show only vector field<br>
+            Press 2: Add one solution curve<br>
+            Press 3: Show multiple solutions<br>
+            Press Space: Follow a particle along the field
+        </div>
+        <div id="explanation" class="explanation">
+            Vector fields show us the slope at every point
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const explanation = document.getElementById('explanation');
+
+        // Make canvas fill most of the window
+        canvas.width = Math.min(800, window.innerWidth - 40);
+        canvas.height = 400;
+
+        let mode = 1;  // 1: vectors only, 2: one solution, 3: multiple solutions
+        let isAnimating = false;
+        let particlePos = { x: -2, y: 1 };  // Starting position for animated particle
+
+        const colors = {
+            grid: '#333',
+            axis: '#666',
+            vector: '#00ff88',
+            solution: '#ff3366',
+            particle: '#ffff00'
+        };
+
+        // Convert math coordinates to canvas coordinates
+        function toCanvasX(x) {
+            return (x + 4) * (canvas.width / 8);
+        }
+
+        function toCanvasY(y) {
+            return canvas.height - (y + 2) * (canvas.height / 4);
+        }
+
+        // Convert canvas coordinates to math coordinates
+        function toMathX(canvasX) {
+            return (canvasX / canvas.width) * 8 - 4;
+        }
+
+        function toMathY(canvasY) {
+            return ((canvas.height - canvasY) / canvas.height) * 4 - 2;
+        }
+
+        function drawGrid() {
+            // Draw grid
+            ctx.strokeStyle = colors.grid;
+            ctx.lineWidth = 0.5;
+            
+            // Vertical lines
+            for(let x = -4; x <= 4; x++) {
+                ctx.beginPath();
+                ctx.moveTo(toCanvasX(x), 0);
+                ctx.lineTo(toCanvasX(x), canvas.height);
+                ctx.stroke();
+            }
+            
+            // Horizontal lines
+            for(let y = -2; y <= 2; y++) {
+                ctx.beginPath();
+                ctx.moveTo(0, toCanvasY(y));
+                ctx.lineTo(canvas.width, toCanvasY(y));
+                ctx.stroke();
+            }
+
+            // Draw axes
+            ctx.strokeStyle = colors.axis;
+            ctx.lineWidth = 2;
+            
+            // x-axis
+            ctx.beginPath();
+            ctx.moveTo(0, toCanvasY(0));
+            ctx.lineTo(canvas.width, toCanvasY(0));
+            ctx.stroke();
+            
+            // y-axis
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(0), 0);
+            ctx.lineTo(toCanvasX(0), canvas.height);
+            ctx.stroke();
+        }
+
+        function drawVectorField() {
+            const spacing = 0.5;
+            
+            for(let x = -4; x <= 4; x += spacing) {
+                for(let y = -2; y <= 2; y += spacing) {
+                    // For dy/dx = y, the slope at any point is y
+                    const slope = y;
+                    const length = 0.2;
+                    const angle = Math.atan2(slope, 1);
+                    
+                    const startX = toCanvasX(x);
+                    const startY = toCanvasY(y);
+                    const endX = startX + length * Math.cos(angle) * 40;
+                    const endY = startY - length * Math.sin(angle) * 40;
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = colors.vector;
+                    ctx.lineWidth = 1;
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawSolution(startY) {
+            ctx.beginPath();
+            ctx.strokeStyle = colors.solution;
+            ctx.lineWidth = 2;
+
+            for(let x = -4; x <= 4; x += 0.1) {
+                const y = startY * Math.exp(x);
+                ctx.lineTo(toCanvasX(x), toCanvasY(y));
+            }
+            ctx.stroke();
+        }
+
+        function drawParticle() {
+            ctx.beginPath();
+            ctx.fillStyle = colors.particle;
+            ctx.arc(toCanvasX(particlePos.x), toCanvasY(particlePos.y), 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function updateParticle() {
+            // Update particle position based on the differential equation dy/dx = y
+            const dx = 0.05;
+            const dy = particlePos.y * dx;
+            particlePos.x += dx;
+            particlePos.y += dy;
+
+            // Reset if particle goes out of bounds
+            if(particlePos.x > 4 || Math.abs(particlePos.y) > 2) {
+                particlePos = { x: -2, y: 1 };
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+            drawVectorField();
+
+            if(mode >= 2) {
+                drawSolution(1);
+            }
+            
+            if(mode >= 3) {
+                drawSolution(0.5);
+                drawSolution(-0.5);
+                drawSolution(-1);
+            }
+
+            if(isAnimating) {
+                drawParticle();
+                updateParticle();
+            }
+        }
+
+        function animate() {
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        document.addEventListener('keydown', e => {
+            switch(e.key) {
+                case '1':
+                    mode = 1;
+                    explanation.innerHTML = `
+                        The green arrows show the slope at each point.<br>
+                        For dy/dx = y, the slope equals the y-coordinate.<br>
+                        Higher up = steeper slope upward<br>
+                        Lower down = less steep slope
+                    `;
+                    break;
+                case '2':
+                    mode = 2;
+                    explanation.innerHTML = `
+                        The red curve shows one possible solution.<br>
+                        Notice how it always follows the direction of the green arrows!<br>
+                        This is the solution y = e^x
+                    `;
+                    break;
+                case '3':
+                    mode = 3;
+                    explanation.innerHTML = `
+                        Multiple solutions show different possible paths.<br>
+                        Each solution follows the same "rules" (arrows)<br>
+                        But starts from a different point.
+                    `;
+                    break;
+                case ' ':
+                    isAnimating = !isAnimating;
+                    if(isAnimating) {
+                        explanation.innerHTML = `
+                            Watch the yellow particle follow the vector field!<br>
+                            It's like flowing along the arrows.<br>
+                            This shows how solutions "flow" along the vector field.
+                        `;
+                    }
+                    break;
+            }
+        });
+
+        animate();
+    </script>
+</body>
+</html>

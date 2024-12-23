@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Eigendecomposition Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: black;
+            color: white;
+            font-family: monospace;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            width: 100vw;
+            height: 100vh;
+        }
+        .canvas-container {
+            position: relative;
+            border: 1px solid #333;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            background: black;
+        }
+        .info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            pointer-events: none;
+        }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            z-index: 1000;
+        }
+        input[type="range"] {
+            width: 200px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="canvas-container">
+            <canvas id="original"></canvas>
+            <div class="info">
+                Original Transformation<br>
+                A = PDP⁻¹<br>
+                • Green/Red: Basis vectors<br>
+                • Purple: Eigenvectors
+            </div>
+        </div>
+        <div class="canvas-container">
+            <canvas id="eigenvectors"></canvas>
+            <div class="info">
+                Eigenvector Matrix P<br>
+                • Change of basis to<br>
+                eigenvector coordinates<br>
+                • Purple: New basis
+            </div>
+        </div>
+        <div class="canvas-container">
+            <canvas id="diagonal"></canvas>
+            <div class="info">
+                Diagonal Matrix D<br>
+                • Pure scaling along<br>
+                eigenvector directions<br>
+                • Scale factors = eigenvalues
+            </div>
+        </div>
+        <div class="canvas-container">
+            <canvas id="inverse"></canvas>
+            <div class="info">
+                Inverse Transform P⁻¹<br>
+                • Change back to<br>
+                standard coordinates<br>
+                • Complete decomposition
+            </div>
+        </div>
+    </div>
+    <div id="controls">
+        <input type="range" id="matrix-slider" min="0" max="100" value="50">
+        <br>
+        <button id="animate-btn">Animate Decomposition</button>
+    </div>
+    <script>
+        const state = {
+            matrix: {
+                a: 2, b: 1,
+                c: 1, d: 2
+            },
+            t: 0,
+            animating: false
+        };
+
+        function arrow(ctx, x1, y1, x2, y2, s) {
+            const a = Math.atan2(y2 - y1, x2 - x1);
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2-0.8*s*Math.cos(a), y2-0.8*s*Math.sin(a));
+            ctx.lineTo(x2-s*Math.cos(a-Math.PI/7), y2-s*Math.sin(a-Math.PI/7));
+            ctx.lineTo(x2, y2);
+            ctx.lineTo(x2-s*Math.cos(a+Math.PI/7), y2-s*Math.sin(a+Math.PI/7));
+            ctx.lineTo(x2-0.8*s*Math.cos(a), y2-0.8*s*Math.sin(a));
+            ctx.closePath();
+            ctx.stroke();
+            ctx.fill();
+        }
+
+        function drawGrid(ctx, transform = null) {
+            const gridSize = 5;
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+
+            for(let i = -gridSize; i <= gridSize; i++) {
+                for(let j = -gridSize; j <= gridSize; j++) {
+                    let x1 = i, y1 = j;
+                    let x2 = i+1, y2 = j;
+                    let x3 = i, y3 = j+1;
+
+                    if(transform) {
+                        [x1, y1] = transformPoint(x1, y1, transform);
+                        [x2, y2] = transformPoint(x2, y2, transform);
+                        [x3, y3] = transformPoint(x3, y3, transform);
+                    }
+
+                    ctx.beginPath();
+                    ctx.moveTo(...toScreen(ctx.canvas, x1, y1));
+                    ctx.lineTo(...toScreen(ctx.canvas, x2, y2));
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(...toScreen(ctx.canvas, x1, y1));
+                    ctx.lineTo(...toScreen(ctx.canvas, x3, y3));
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function transformPoint(x, y, matrix) {
+            return [
+                matrix.a * x + matrix.b * y,
+                matrix.c * x + matrix.d * y
+            ];
+        }
+
+        function toScreen(canvas, x, y) {
+            const scale = Math.min(canvas.width, canvas.height) / 8;
+            return [
+                canvas.width/2 + x * scale,
+                canvas.height/2 - y * scale
+            ];
+        }
+
+        function drawVector(ctx, x, y, color = '#ffff00', label = '', start = [0, 0]) {
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            const [sx, sy] = toScreen(ctx.canvas, start[0], start[1]);
+            const [ex, ey] = toScreen(ctx.canvas, start[0] + x, start[1] + y);
+            arrow(ctx, sx, sy, ex, ey, 0.2);
+            
+            if(label) {
+                ctx.font = '16px monospace';
+                ctx.fillText(label, ex + 10, ey);
+            }
+        }
+
+        function getEigenDecomposition(matrix) {
+            // Calculate eigenvalues and eigenvectors
+            const a = 1;
+            const b = -(matrix.a + matrix.d);
+            const c = matrix.a * matrix.d - matrix.b * matrix.c;
+            
+            const discriminant = Math.sqrt(b*b - 4*a*c);
+            const λ1 = (-b + discriminant) / (2*a);
+            const λ2 = (-b - discriminant) / (2*a);
+
+            // Get eigenvectors
+            function getEigenvector(λ) {
+                const v1 = matrix.b;
+                const v2 = λ - matrix.a;
+                const len = Math.sqrt(v1*v1 + v2*v2);
+                return [v1/len, v2/len];
+            }
+
+            const ev1 = getEigenvector(λ1);
+            const ev2 = getEigenvector(λ2);
+
+            return {
+                P: {a: ev1[0], b: ev2[0], c: ev1[1], d: ev2[1]},
+                D: {a: λ1, b: 0, c: 0, d: λ2},
+                eigenvalues: [λ1, λ2],
+                eigenvectors: [ev1, ev2]
+            };
+        }
+
+        function drawOriginalTransform(ctx) {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+            drawGrid(ctx, state.matrix);
+
+            // Draw basis vectors
+            drawVector(ctx, state.matrix.a, state.matrix.c, '#8cbe63', 'Ax₁');
+            drawVector(ctx, state.matrix.b, state.matrix.d, '#ff7c5c', 'Ax₂');
+
+            // Draw eigenvectors
+            const decomp = getEigenDecomposition(state.matrix);
+            decomp.eigenvectors.forEach((ev, i) => {
+                const scaled = transformPoint(ev[0], ev[1], state.matrix);
+                drawVector(ctx, ev[0], ev[1], '#ff44ff', `e${i+1}`);
+                drawVector(ctx, scaled[0], scaled[1], '#ff44ff', `λ${i+1}e${i+1}`);
+            });
+        }
+
+        function drawEigenvectorTransform(ctx) {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+            const decomp = getEigenDecomposition(state.matrix);
+            const transform = decomp.P;
+
+            drawGrid(ctx, transform);
+
+            // Draw transformed basis vectors
+            drawVector(ctx, transform.a, transform.c, '#ff44ff', 'e₁');
+            drawVector(ctx, transform.b, transform.d, '#ff44ff', 'e₂');
+        }
+
+        function drawDiagonalTransform(ctx) {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+            const decomp = getEigenDecomposition(state.matrix);
+            drawGrid(ctx, decomp.D);
+
+            // Draw scaled vectors
+            drawVector(ctx, decomp.D.a, 0, '#ff44ff', 'λ₁');
+            drawVector(ctx, 0, decomp.D.d, '#ff44ff', 'λ₂');
+        }
+
+        function drawInverseTransform(ctx) {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+            const decomp = getEigenDecomposition(state.matrix);
+            const det = decomp.P.a * decomp.P.d - decomp.P.b * decomp.P.c;
+            const invP = {
+                a: decomp.P.d/det,
+                b: -decomp.P.b/det,
+                c: -decomp.P.c/det,
+                d: decomp.P.a/det
+            };
+
+            drawGrid(ctx, invP);
+
+            // Draw inverse transformed vectors
+            drawVector(ctx, invP.a, invP.c, '#8cbe63', 'x₁');
+            drawVector(ctx, invP.b, invP.d, '#ff7c5c', 'x₂');
+        }
+
+        function updateCanvases() {
+            const original = document.getElementById('original').getContext('2d');
+            const eigenvectors = document.getElementById('eigenvectors').getContext('2d');
+            const diagonal = document.getElementById('diagonal').getContext('2d');
+            const inverse = document.getElementById('inverse').getContext('2d');
+
+            drawOriginalTransform(original);
+            drawEigenvectorTransform(eigenvectors);
+            drawDiagonalTransform(diagonal);
+            drawInverseTransform(inverse);
+        }
+
+        function init() {
+            const canvases = ['original', 'eigenvectors', 'diagonal', 'inverse'].map(
+                id => document.getElementById(id)
+            );
+
+            // Set canvas sizes
+            canvases.forEach(canvas => {
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+            });
+
+            // Add event listeners
+            document.getElementById('matrix-slider').addEventListener('input', e => {
+                const t = e.target.value / 100;
+                state.matrix = {
+                    a: 2 + t, b: 1,
+                    c: 1, d: 2 + t
+                };
+                updateCanvases();
+            });
+
+            document.getElementById('animate-btn').addEventListener('click', () => {
+                if (!state.animating) {
+                    state.animating = true;
+                    let t = 0;
+                    function animate() {
+                        if (state.animating) {
+                            t = (t + 0.01) % 1;
+                            document.getElementById('matrix-slider').value = t * 100;
+                            state.matrix = {
+                                a: 2 + t, b: 1,
+                                c: 1, d: 2 + t
+                            };
+                            updateCanvases();
+                            requestAnimationFrame(animate);
+                        }
+                    }
+                    animate();
+                } else {
+                    state.animating = false;
+                }
+            });
+
+            // Initial render
+            updateCanvases();
+        }
+
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

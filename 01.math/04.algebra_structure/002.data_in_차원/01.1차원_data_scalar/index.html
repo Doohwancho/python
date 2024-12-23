@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            background: black;
+            color: white;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        canvas { display: block; }
+        .visualization {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 33.33%;
+            box-sizing: border-box;
+            border: 1px solid #333;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+        .info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            z-index: 1000;
+        }
+        .slider {
+            width: 200px;
+            margin: 10px;
+        }
+        button {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="visualization">
+        <div class="canvas-container">
+            <canvas id="addition-canvas"></canvas>
+            <div class="info">
+                Scalar Addition<br>
+                • a + b = adding two scalars<br>
+                • Commutative: a + b = b + a<br>
+                • Associative: (a + b) + c = a + (b + c)<br>
+                Yellow: a, Blue: b, Green: a + b
+            </div>
+        </div>
+        <div class="canvas-container">
+            <canvas id="multiplication-canvas"></canvas>
+            <div class="info">
+                Scalar Multiplication<br>
+                • a × b = multiplying two scalars<br>
+                • Commutative: a × b = b × a<br>
+                • Associative: (a × b) × c = a × (b × c)<br>
+                • Distributive: a × (b + c) = ab + ac
+            </div>
+        </div>
+        <div class="canvas-container">
+            <canvas id="scaling-canvas"></canvas>
+            <div class="info">
+                Scalar Scaling<br>
+                • Positive: stretches/shrinks<br>
+                • Negative: flips and scales<br>
+                • Zero: collapses to zero<br>
+                Drag points or use sliders
+            </div>
+        </div>
+    </div>
+    <div id="controls">
+        <div>
+            a: <span id="a-value">1.0</span>
+            <input type="range" id="a-slider" class="slider" min="-200" max="200" value="100">
+        </div>
+        <div>
+            b: <span id="b-value">1.0</span>
+            <input type="range" id="b-slider" class="slider" min="-200" max="200" value="100">
+        </div>
+        <button id="reset-btn">Reset</button>
+    </div>
+    <script>
+        // Initialize canvases
+        const addCanvas = document.getElementById('addition-canvas');
+        const multCanvas = document.getElementById('multiplication-canvas');
+        const scaleCanvas = document.getElementById('scaling-canvas');
+        
+        const addCtx = addCanvas.getContext('2d');
+        const multCtx = multCanvas.getContext('2d');
+        const scaleCtx = scaleCanvas.getContext('2d');
+
+        // Set canvas sizes
+        function resizeCanvases() {
+            [addCanvas, multCanvas, scaleCanvas].forEach(canvas => {
+                const container = canvas.parentElement;
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+            });
+        }
+        resizeCanvases();
+        window.addEventListener('resize', resizeCanvases);
+
+        // State
+        let a = 1.0;
+        let b = 1.0;
+        let isDragging = false;
+        let dragTarget = null;
+
+        // Utility functions
+        function toScreen(canvas, x) {
+            const scale = canvas.width / 8;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2
+            };
+        }
+
+        function fromScreen(canvas, x) {
+            const scale = canvas.width / 8;
+            return (x - canvas.width/2) / scale;
+        }
+
+        function drawNumberLine(ctx) {
+            const canvas = ctx.canvas;
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            
+            // Draw main line
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height/2);
+            ctx.lineTo(canvas.width, canvas.height/2);
+            ctx.stroke();
+            
+            // Draw ticks
+            const scale = canvas.width / 8;
+            for(let i = -4; i <= 4; i++) {
+                const x = canvas.width/2 + i * scale;
+                ctx.beginPath();
+                ctx.moveTo(x, canvas.height/2 - 5);
+                ctx.lineTo(x, canvas.height/2 + 5);
+                ctx.stroke();
+                
+                // Draw numbers
+                ctx.fillStyle = '#666';
+                ctx.textAlign = 'center';
+                ctx.fillText(i.toString(), x, canvas.height/2 + 20);
+            }
+        }
+
+        function drawPoint(ctx, x, color, label = '', size = 8) {
+            const pos = toScreen(ctx.canvas, x);
+            
+            // Draw point
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw label
+            if(label) {
+                ctx.fillStyle = color;
+                ctx.textAlign = 'center';
+                ctx.fillText(label, pos.x, pos.y - 15);
+            }
+        }
+
+        function drawAddition() {
+            addCtx.fillStyle = 'black';
+            addCtx.fillRect(0, 0, addCanvas.width, addCanvas.height);
+            
+            drawNumberLine(addCtx);
+            
+            // Draw points
+            drawPoint(addCtx, a, '#ffff00', `a = ${a.toFixed(2)}`);
+            drawPoint(addCtx, b, '#4444ff', `b = ${b.toFixed(2)}`);
+            drawPoint(addCtx, a + b, '#44ff44', `a + b = ${(a + b).toFixed(2)}`);
+            
+            // Draw arrows
+            const start = toScreen(addCanvas, 0);
+            const aPos = toScreen(addCanvas, a);
+            const bPos = toScreen(addCanvas, b);
+            const sumPos = toScreen(addCanvas, a + b);
+            
+            // Draw addition arrows
+            addCtx.setLineDash([5, 5]);
+            addCtx.strokeStyle = '#ffff00';
+            addCtx.beginPath();
+            addCtx.moveTo(start.x, start.y);
+            addCtx.lineTo(aPos.x, aPos.y);
+            addCtx.stroke();
+            
+            addCtx.strokeStyle = '#4444ff';
+            addCtx.beginPath();
+            addCtx.moveTo(aPos.x, aPos.y);
+            addCtx.lineTo(sumPos.x, sumPos.y);
+            addCtx.stroke();
+            addCtx.setLineDash([]);
+        }
+
+        function drawMultiplication() {
+            multCtx.fillStyle = 'black';
+            multCtx.fillRect(0, 0, multCanvas.width, multCanvas.height);
+            
+            drawNumberLine(multCtx);
+            
+            // Draw points
+            drawPoint(multCtx, a, '#ffff00', `a = ${a.toFixed(2)}`);
+            drawPoint(multCtx, b, '#4444ff', `b = ${b.toFixed(2)}`);
+            drawPoint(multCtx, a * b, '#44ff44', `a × b = ${(a * b).toFixed(2)}`);
+            
+            // Show distributive property
+            if(Math.abs(a + b) <= 4) {
+                const sum = a + b;
+                const prod1 = a * sum;
+                const prod2 = a * a + a * b;
+                
+                multCtx.fillStyle = '#666';
+                multCtx.textAlign = 'left';
+                multCtx.fillText(`a(a + b) = ${prod1.toFixed(2)}`, 10, 30);
+                multCtx.fillText(`a² + ab = ${prod2.toFixed(2)}`, 10, 50);
+            }
+        }
+
+        function drawScaling() {
+            scaleCtx.fillStyle = 'black';
+            scaleCtx.fillRect(0, 0, scaleCanvas.width, scaleCanvas.height);
+            
+            drawNumberLine(scaleCtx);
+            
+            // Draw original point
+            drawPoint(scaleCtx, 1, '#ffff00', '1');
+            
+            // Draw scaled points
+            drawPoint(scaleCtx, a, '#44ff44', `${a.toFixed(2)}×1`);
+            
+            // Show scaling effect
+            scaleCtx.fillStyle = '#666';
+            scaleCtx.textAlign = 'left';
+            if(a > 0) {
+                scaleCtx.fillText('Stretching', 10, 30);
+            } else if(a < 0) {
+                scaleCtx.fillText('Flipping and Scaling', 10, 30);
+            } else {
+                scaleCtx.fillText('Collapsed to Zero', 10, 30);
+            }
+        }
+
+        function drawAll() {
+            drawAddition();
+            drawMultiplication();
+            drawScaling();
+        }
+
+        // Event handlers
+        const aSlider = document.getElementById('a-slider');
+        const bSlider = document.getElementById('b-slider');
+        const aValue = document.getElementById('a-value');
+        const bValue = document.getElementById('b-value');
+        const resetBtn = document.getElementById('reset-btn');
+
+        aSlider.addEventListener('input', (e) => {
+            a = e.target.value / 100;
+            aValue.textContent = a.toFixed(2);
+            drawAll();
+        });
+
+        bSlider.addEventListener('input', (e) => {
+            b = e.target.value / 100;
+            bValue.textContent = b.toFixed(2);
+            drawAll();
+        });
+
+        resetBtn.addEventListener('click', () => {
+            a = 1.0;
+            b = 1.0;
+            aSlider.value = 100;
+            bSlider.value = 100;
+            aValue.textContent = "1.0";
+            bValue.textContent = "1.0";
+            drawAll();
+        });
+
+        // Initialize
+        drawAll();
+    </script>
+</body>
+</html>

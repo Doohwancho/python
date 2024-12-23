@@ -1,4 +1,26 @@
-window.onload = function () {
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Cube on Cartesian Coordinates</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+        }
+        canvas {
+            display: block;
+        }
+        input[type="range"] {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script src="bayes.js"></script>
+    <script>
+        window.onload = function () {
     const canvas = document.getElementById("canvas"),
         context = canvas.getContext("2d"),
         width = (canvas.width = window.innerWidth),
@@ -241,3 +263,6 @@ window.onload = function () {
 
     animate();
 };
+    </script>
+</body>
+</html>

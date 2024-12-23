@@ -1,23 +1,334 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>3D Cube on Cartesian Coordinates</title>
+    <meta charset="utf-8">
+    <title>Bayes' Theorem Visualization</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background: black;
-        }
-        canvas {
-            display: block;
-        }
-        input[type="range"] {
-            margin: 10px 0;
-        }
+.container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+canvas {
+    background: black;
+    width: 75%;
+}
+
+.controls {
+    width: 25%;
+    min-width: 300px;
+    padding: 15px;  /* Reduced padding */
+    background: white;
+    height: 100vh;
+    overflow-y: auto;
+    box-shadow: -2px 0 10px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;  /* Reduced gap */
+    font-size: 13px;  /* Smaller base font size */
+}
+
+.slider-container {
+    margin: 10px 0;  /* Reduced margin */
+}
+
+label {
+    display: block;
+    margin-bottom: 3px;  /* Reduced margin */
+    font-size: 12px;
+}
+
+input[type="range"] {
+    width: 100%;
+    margin: 5px 0;  /* Reduced margin */
+}
+
+.box-info {
+    margin-top: 10px;
+    padding: 10px;
+    background: white;
+    border-radius: 4px;
+}
+
+.bayes-explanation {
+    margin-top: 10px;
+    padding: 10px;
+    background: white;
+    border-radius: 4px;
+    font-size: 12px;  /* Smaller font for explanation */
+}
+
+h3 {
+    margin: 5px 0;
+    font-size: 16px;
+}
+
+h4 {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+h5 {
+    margin: 5px 0;
+    font-size: 13px;
+}
+
+#bayes-values {
+    padding-left: 10px;  /* Reduced padding */
+    line-height: 1.3;   /* Tighter line height */
+}
+
+#area-explanation {
+    line-height: 1.3;   /* Tighter line height */
+}
+
+/* Make values more compact but readable */
+span[id$="-value"] {
+    color: #4CAF50;
+    font-weight: bold;
+    display: inline-block;
+    min-width: 45px;
+}
+
+/* Compact spacing for probability values */
+.box-info div {
+    margin: 3px 0;
+}
     </style>
 </head>
 <body>
-    <canvas id="canvas"></canvas>
-    <script src="bayes.js"></script>
+    <div class="container">
+        <canvas id="canvas"></canvas>
+        <!-- Add this section to the controls div after the existing sliders -->
+        <div class="controls">
+            <h3>Bayes' Theorem Parameters</h3>
+ 
+            <div class="slider-container">
+                <label>Sensitivity P(E|H): <span id="sensitivity-value">0.99</span></label>
+                <input type="range" id="sensitivity" min="0" max="100" value="99">
+            </div>
+            
+            <div class="slider-container">
+                <label>Specificity P(E^c|H^c): <span id="specificity-value">0.98</span></label>
+                <input type="range" id="specificity" min="0" max="100" value="98">
+            </div>
+            
+            <div class="slider-container">
+                <label>Prevalence P(H): <span id="prevalence-value">0.047</span></label>
+                <input type="range" id="prevalence" min="0" max="100" value="4.7">
+            </div>
+            
+            <div class="box-info">
+                <h4>Probabilities:</h4>
+                <div>True Positive: <span id="tp-value">0</span></div>
+                <div>False Positive: <span id="fp-value">0</span></div>
+                <div>True Negative: <span id="tn-value">0</span></div>
+                <div>False Negative: <span id="fn-value">0</span></div>
+                <div>PPV: <span id="ppv-value">0</span></div>
+            </div>
+
+            
+            <div class="bayes-explanation" style="margin-top: 20px; padding: 15px; background: white; border-radius: 4px;">
+                <h4>Bayes' Theorem Explanation</h4>
+                <div style="font-family: monospace; line-height: 1.5;">
+                    P(H|E) = P(E|H) * P(H) / P(E)
+                    <br>
+                    Where:
+                    <div id="bayes-values" style="padding-left: 15px;">
+                        P(H|E) = <span id="posterior-value">0</span> (Posterior)
+                        <br>
+                        P(E|H) = <span id="sensitivity-prob">0.99</span> (Sensitivity)
+                        <br>
+                        P(H) = <span id="prior-value">0.047</span> (Prior)
+                        <br>
+                        P(E) = <span id="evidence-value">0</span> (Evidence)
+                    </div>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <h5>Box Areas Represent:</h5>
+                    <div id="area-explanation">
+                        • Total Box = Total Population (1.0)
+                        <br>
+                        • Left Column = Disease Present (<span id="disease-prev">0.047</span>)
+                        <br>
+                        • Right Column = Disease Absent (<span id="disease-absent">0.953</span>)
+                        <br>
+                        • Blue Area / (Blue + Orange) = PPV (<span id="ppv-area">0</span>)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let state = {
+            sensitivity: 0.99,
+            specificity: 0.98,
+            prevalence: 0.047
+        };
+
+        function updateCanvasSize() {
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+        }
+
+        function calculateBayesValues() {
+            const { sensitivity, specificity, prevalence } = state;
+            
+            // Calculate all probabilities
+            const truePositive = sensitivity * prevalence;
+            const falseNegative = (1 - sensitivity) * prevalence;
+            const falsePositive = (1 - specificity) * (1 - prevalence);
+            const trueNegative = specificity * (1 - prevalence);
+            
+            // Total positive tests (evidence)
+            const evidence = truePositive + falsePositive;
+            
+            // PPV calculation (posterior probability)
+            const ppv = truePositive / evidence;
+
+            // Update all probability displays - Convert to percentages
+            document.getElementById('tp-value').textContent = `${(truePositive * 100).toFixed(1)}%`;
+            document.getElementById('fp-value').textContent = `${(falsePositive * 100).toFixed(1)}%`;
+            document.getElementById('tn-value').textContent = `${(trueNegative * 100).toFixed(1)}%`;
+            document.getElementById('fn-value').textContent = `${(falseNegative * 100).toFixed(1)}%`;
+            document.getElementById('ppv-value').textContent = `${(ppv * 100).toFixed(1)}%`;
+
+            // Update Bayes' theorem values
+            document.getElementById('posterior-value').textContent = ppv.toFixed(3);
+            document.getElementById('sensitivity-prob').textContent = sensitivity.toFixed(3);
+            document.getElementById('prior-value').textContent = prevalence.toFixed(3);
+            document.getElementById('evidence-value').textContent = evidence.toFixed(3);
+
+            // Update area explanations
+            document.getElementById('disease-prev').textContent = prevalence.toFixed(3);
+            document.getElementById('disease-absent').textContent = (1 - prevalence).toFixed(3);
+            document.getElementById('ppv-area').textContent = ppv.toFixed(3);
+
+            return {
+                truePositive,
+                falseNegative,
+                falsePositive,
+                trueNegative,
+                ppv,
+                evidence
+            };
+        }
+
+        function drawBayesBox() {
+            const values = calculateBayesValues();
+            const width = canvas.width * 0.8;
+            const height = canvas.height * 0.8;
+            const x = (canvas.width - width) / 2;
+            const y = (canvas.height - height) / 2;
+
+            // Clear canvas
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Calculate box sizes proportional to probabilities
+            const diseaseWidth = width * state.prevalence;
+            const healthyWidth = width * (1 - state.prevalence);
+            const tpHeight = height * state.sensitivity;
+            const fpHeight = height * (1 - state.specificity);
+
+            // Add animation for smooth transitions
+            ctx.save();
+            ctx.globalAlpha = 0.8;  // Make boxes slightly transparent
+
+            // Draw boxes with borders
+            function drawBoxWithBorder(x, y, w, h, fillColor) {
+                ctx.fillStyle = fillColor;
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.fillRect(x, y, w, h);
+                ctx.strokeRect(x, y, w, h);
+            }
+
+            // True Positive (Blue)
+            drawBoxWithBorder(x, y, diseaseWidth, tpHeight, 'rgba(100, 150, 255, 0.8)');
+
+            // False Negative (Red)
+            drawBoxWithBorder(x, y + tpHeight, diseaseWidth, height - tpHeight, 'rgba(255, 100, 100, 0.8)');
+
+            // False Positive (Orange)
+            drawBoxWithBorder(x + diseaseWidth, y + height - fpHeight, healthyWidth, fpHeight, 'rgba(255, 200, 100, 0.8)');
+
+            // True Negative (Green)
+            drawBoxWithBorder(x + diseaseWidth, y, healthyWidth, height - fpHeight, 'rgba(100, 255, 100, 0.8)');
+
+            // Draw dividing lines for visual clarity
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x + diseaseWidth, y);
+            ctx.lineTo(x + diseaseWidth, y + height);
+            ctx.stroke();
+
+            // Add labels and values
+            ctx.font = 'bold 16px Arial';
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+
+            // Labels
+            const labels = [
+                { text: `True Positive\n${(values.truePositive * 100).toFixed(1)}%`, x: x + diseaseWidth/2, y: y + tpHeight/2 },
+                { text: `False Negative\n${(values.falseNegative * 100).toFixed(1)}%`, x: x + diseaseWidth/2, y: y + tpHeight + (height-tpHeight)/2 },
+                { text: `True Negative\n${(values.trueNegative * 100).toFixed(1)}%`, x: x + diseaseWidth + healthyWidth/2, y: y + (height-fpHeight)/2 },
+                { text: `False Positive\n${(values.falsePositive * 100).toFixed(1)}%`, x: x + diseaseWidth + healthyWidth/2, y: y + height - fpHeight/2 }
+            ];
+
+            labels.forEach(label => {
+                const lines = label.text.split('\n');
+                lines.forEach((line, i) => {
+                    ctx.fillText(line, label.x, label.y + i * 20 - 10);
+                });
+            });
+
+            ctx.restore();
+        }
+
+        function setupEventListeners() {
+            // Sensitivity slider
+            document.getElementById('sensitivity').addEventListener('input', (e) => {
+                state.sensitivity = e.target.value / 100;
+                document.getElementById('sensitivity-value').textContent = state.sensitivity.toFixed(3);
+                drawBayesBox();
+            });
+
+            // Specificity slider
+            document.getElementById('specificity').addEventListener('input', (e) => {
+                state.specificity = e.target.value / 100;
+                document.getElementById('specificity-value').textContent = state.specificity.toFixed(3);
+                drawBayesBox();
+            });
+
+            // Prevalence slider
+            document.getElementById('prevalence').addEventListener('input', (e) => {
+                state.prevalence = e.target.value / 100;
+                document.getElementById('prevalence-value').textContent = state.prevalence.toFixed(3);
+                drawBayesBox();
+            });
+
+            // Window resize
+            window.addEventListener('resize', () => {
+                updateCanvasSize();
+                drawBayesBox();
+            });
+        }
+
+        function init() {
+            updateCanvasSize();
+            setupEventListeners();
+            drawBayesBox();
+        }
+
+        init();
+    </script>
 </body>
 </html>

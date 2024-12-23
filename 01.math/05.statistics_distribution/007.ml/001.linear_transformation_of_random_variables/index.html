@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linear Transformation of Random Variables</title>
+</head>
+<body>
+<canvas id="canvas" width="600" height="400"></canvas>
+<script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Parameters for random variable X
+    const meanX = 50;
+    const stddevX = 20;
+
+    // Transformation parameters
+    const a = 1.5; // Scaling
+    const b = 30;  // Shifting
+
+    // Generate random data points for X
+    function generateRandomPoints(count) {
+        const points = [];
+        for (let i = 0; i < count; i++) {
+            const x = Math.random() * width;
+            const y = randomNormal(meanX, stddevX);
+            points.push({ x, y });
+        }
+        return points;
+    }
+
+    // Generate random numbers with normal distribution
+    function randomNormal(mean, stddev) {
+        let u = 0, v = 0;
+        while (u === 0) u = Math.random();
+        while (v === 0) v = Math.random();
+        const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        return z * stddev + mean;
+    }
+
+    // Apply linear transformation Y = aX + b
+    function linearTransform(points, a, b) {
+        return points.map(p => ({ x: p.x, y: a * p.y + b }));
+    }
+
+    // Draw points on canvas
+    function drawPoints(points, color) {
+        ctx.fillStyle = color;
+        points.forEach(point => {
+            ctx.beginPath();
+            ctx.arc(point.x, height - point.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    // Main function
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+
+        // Original random variable X
+        const pointsX = generateRandomPoints(100);
+        drawPoints(pointsX, "blue");
+
+        // Transformed random variable Y = aX + b
+        const pointsY = linearTransform(pointsX, a, b);
+        drawPoints(pointsY, "red");
+
+        // Labels
+        ctx.fillStyle = "black";
+        ctx.font = "14px Arial";
+        ctx.fillText("Original (X)", 20, 20);
+        ctx.fillStyle = "red";
+        ctx.fillText("Transformed (Y = aX + b)", 20, 40);
+    }
+
+    draw();
+</script>
+</body>
+</html>

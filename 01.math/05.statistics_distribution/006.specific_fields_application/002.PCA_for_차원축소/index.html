@@ -1,17 +1,365 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PCA Visualization</title>
-  <style>
-    canvas {
-      border: 1px solid black;
-    }
-  </style>
+    <style>
+        body { 
+            margin: 0; 
+            background: black; 
+            color: white; 
+            font-family: monospace;
+            overflow: hidden;
+        }
+        canvas { 
+            display: block; 
+        }
+        #explanation {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 400px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        #step {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+    </style>
 </head>
 <body>
-  <canvas id="canvas" width="500" height="500"></canvas>
-  <script src="pca.js"></script>
+    <canvas id="canvas"></canvas>
+    <div id="step">Press Space to go to next step</div>
+    <div id="explanation"></div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const explanationDiv = document.getElementById('explanation');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let currentStep = 1;
+        let time = 0;
+        let isAnimating = true;
+
+        // Generate sample 2D data (height and weight)
+        function generateData(n = 50) {
+            const data = [];
+            for(let i = 0; i < n; i++) {
+                const height = 170 + normalRandom() * 10; // mean 170cm, std 10cm
+                const weight = height * 0.4 + normalRandom() * 5; // correlated with height
+                data.push([height, weight]);
+            }
+            return data;
+        }
+
+        function normalRandom() {
+            let u = 0, v = 0;
+            while(u === 0) u = Math.random();
+            while(v === 0) v = Math.random();
+            return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        }
+
+        let originalData = generateData();
+        let centeredData = [];
+        let pc1, pc2;
+        let projectedData = [];
+
+        function toScreen(x, y) {
+            const scale = 2;
+            return {
+                x: canvas.width/2 + x * scale,
+                y: canvas.height/2 - y * scale
+            };
+        }
+
+        function drawAxes() {
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 1;
+            
+            // Draw grid
+            for(let i = -200; i <= 200; i += 20) {
+                const start = toScreen(i, -200);
+                const end = toScreen(i, 200);
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+
+                const start2 = toScreen(-200, i);
+                const end2 = toScreen(200, i);
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+            }
+
+            // Draw main axes
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 2;
+            const origin = toScreen(0, 0);
+            ctx.beginPath();
+            ctx.moveTo(toScreen(-200, 0).x, toScreen(-200, 0).y);
+            ctx.lineTo(toScreen(200, 0).x, toScreen(200, 0).y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(toScreen(0, -200).x, toScreen(0, -200).y);
+            ctx.lineTo(toScreen(0, 200).x, toScreen(0, 200).y);
+            ctx.stroke();
+        }
+
+        function drawData(data, color = '#4488ff') {
+            ctx.fillStyle = color;
+            data.forEach(point => {
+                const screen = toScreen(point[0], point[1]);
+                ctx.beginPath();
+                ctx.arc(screen.x, screen.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function drawStep1() {
+            // Original data and mean point
+            drawData(originalData, '#4488ff');
+            
+            // Calculate and show mean
+            const meanX = originalData.reduce((sum, p) => sum + p[0], 0) / originalData.length;
+            const meanY = originalData.reduce((sum, p) => sum + p[1], 0) / originalData.length;
+            
+            const meanPoint = toScreen(meanX, meanY);
+            ctx.fillStyle = '#ff4444';
+            ctx.beginPath();
+            ctx.arc(meanPoint.x, meanPoint.y, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Show shift animation
+            const t = (Math.sin(time) + 1) / 2;
+            centeredData = originalData.map(p => [
+                p[0] - meanX * t,
+                p[1] - meanY * t
+            ]);
+            drawData(centeredData, '#44ff44');
+
+            explanationDiv.innerHTML = `
+                <h2>Step 1: Standardization</h2>
+                <p>First, we center the data by subtracting the mean from each point.
+                This moves the center of the data to the origin.</p>
+                <ul>
+                    <li>Blue points: Original data</li>
+                    <li>Red point: Mean</li>
+                    <li>Green points: Centered data</li>
+                </ul>
+                <p>This step is necessary because PCA is sensitive to the scale of the variables.</p>
+            `;
+        }
+
+        function drawStep2() {
+            drawData(centeredData, '#44ff44');
+            
+            // Calculate and show principal direction
+            const angle = time % (Math.PI * 2);
+            const direction = [Math.cos(angle), Math.sin(angle)];
+            
+            // Draw direction line
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(...Object.values(toScreen(-direction[0]*100, -direction[1]*100)));
+            ctx.lineTo(...Object.values(toScreen(direction[0]*100, direction[1]*100)));
+            ctx.stroke();
+
+            // Draw projections
+            centeredData.forEach(point => {
+                const dot = point[0]*direction[0] + point[1]*direction[1];
+                const proj = [direction[0]*dot, direction[1]*dot];
+                
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                ctx.beginPath();
+                ctx.moveTo(...Object.values(toScreen(point[0], point[1])));
+                ctx.lineTo(...Object.values(toScreen(proj[0], proj[1])));
+                ctx.stroke();
+            });
+
+            explanationDiv.innerHTML = `
+                <h2>Step 2: Finding Principal Components</h2>
+                <p>We search for the direction where the data has maximum variance.
+                This is done by finding the direction that maximizes the sum of
+                squared distances of the projections.</p>
+                <ul>
+                    <li>Green points: Centered data</li>
+                    <li>Red line: Current direction</li>
+                    <li>White lines: Projections</li>
+                </ul>
+                <p>The direction that maximizes the variance will become our first
+                principal component (PC1).</p>
+            `;
+        }
+
+        function drawStep3() {
+            drawData(centeredData, '#44ff44');
+            
+            // Show PC1
+            pc1 = [Math.cos(Math.PI/4), Math.sin(Math.PI/4)];
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(...Object.values(toScreen(-pc1[0]*100, -pc1[1]*100)));
+            ctx.lineTo(...Object.values(toScreen(pc1[0]*100, pc1[1]*100)));
+            ctx.stroke();
+
+            // Show loading scores
+            const scores = centeredData.map(point => 
+                point[0]*pc1[0] + point[1]*pc1[1]
+            );
+
+            explanationDiv.innerHTML = `
+                <h2>Step 3: Computing Loading Scores</h2>
+                <p>Once we find PC1, we can compute the loading scores, which tell
+                us how much each original variable contributes to the principal
+                component.</p>
+                <ul>
+                    <li>Red line: PC1 direction</li>
+                    <li>Loading scores: [${pc1[0].toFixed(2)}, ${pc1[1].toFixed(2)}]</li>
+                </ul>
+                <p>These scores show the relative importance of each original
+                variable in the principal component.</p>
+            `;
+        }
+
+        function drawStep4() {
+            drawData(centeredData, '#44ff44');
+            
+            // Show PC1 and PC2
+            pc1 = [Math.cos(Math.PI/4), Math.sin(Math.PI/4)];
+            pc2 = [-Math.sin(Math.PI/4), Math.cos(Math.PI/4)];
+            
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(...Object.values(toScreen(-pc1[0]*100, -pc1[1]*100)));
+            ctx.lineTo(...Object.values(toScreen(pc1[0]*100, pc1[1]*100)));
+            ctx.stroke();
+
+            ctx.strokeStyle = '#ff8844';
+            ctx.beginPath();
+            ctx.moveTo(...Object.values(toScreen(-pc2[0]*100, -pc2[1]*100)));
+            ctx.lineTo(...Object.values(toScreen(pc2[0]*100, pc2[1]*100)));
+            ctx.stroke();
+
+            explanationDiv.innerHTML = `
+                <h2>Step 4: Finding Second Principal Component</h2>
+                <p>PC2 must be perpendicular to PC1 and explain the maximum
+                remaining variance in the data.</p>
+                <ul>
+                    <li>Red line: PC1</li>
+                    <li>Orange line: PC2</li>
+                </ul>
+                <p>In 2D, PC2 is uniquely determined as the perpendicular direction
+                to PC1. In higher dimensions, we would need to find the direction
+                of maximum variance perpendicular to all previous PCs.</p>
+            `;
+        }
+
+        function drawStep5() {
+            // Project data onto PC1 and PC2
+            projectedData = centeredData.map(point => {
+                const score1 = point[0]*pc1[0] + point[1]*pc1[1];
+                const score2 = point[0]*pc2[0] + point[1]*pc2[1];
+                return [score1, score2];
+            });
+
+            // Rotate view based on time
+            const t = (Math.sin(time) + 1) / 2;
+            const rotatedData = projectedData.map(p => [
+                p[0],
+                p[1] * (1-t)
+            ]);
+
+            drawData(rotatedData, '#44ff44');
+
+            // Draw PC1 and PC2 axes
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(...Object.values(toScreen(-100, 0)));
+            ctx.lineTo(...Object.values(toScreen(100, 0)));
+            ctx.stroke();
+
+            ctx.strokeStyle = '#ff8844';
+            ctx.beginPath();
+            ctx.moveTo(...Object.values(toScreen(0, -100 * (1-t))));
+            ctx.lineTo(...Object.values(toScreen(0, 100 * (1-t))));
+            ctx.stroke();
+
+            // Draw scree plot
+            const variance1 = 0.85;
+            const variance2 = 0.15;
+            
+            ctx.fillStyle = '#ff4444';
+            ctx.fillRect(canvas.width-150, 50, 40, variance1*200);
+            
+            ctx.fillStyle = '#ff8844';
+            ctx.fillRect(canvas.width-100, 50, 40, variance2*200);
+
+            explanationDiv.innerHTML = `
+                <h2>Step 5: Data Projection & Scree Plot</h2>
+                <p>Finally, we can project our data onto the new PC axes and
+                visualize how much variance each PC explains.</p>
+                <ul>
+                    <li>PC1 explains ${(variance1*100).toFixed(1)}% of variance</li>
+                    <li>PC2 explains ${(variance2*100).toFixed(1)}% of variance</li>
+                </ul>
+                <p>Since PC1 explains most of the variance, we could reduce the
+                dimensionality by keeping only PC1, losing only
+                ${(variance2*100).toFixed(1)}% of the information.</p>
+            `;
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawAxes();
+
+            switch(currentStep) {
+                case 1: drawStep1(); break;
+                case 2: drawStep2(); break;
+                case 3: drawStep3(); break;
+                case 4: drawStep4(); break;
+                case 5: drawStep5(); break;
+            }
+        }
+
+        document.addEventListener('keydown', e => {
+            if(e.code === 'Space') {
+                currentStep = (currentStep % 5) + 1;
+                time = 0;
+            }
+            draw();
+        });
+
+        function animate() {
+            time += 0.02;
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        });
+
+        animate();
+    </script>
 </body>
 </html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .box {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            margin: 2px;
+            text-align: center;
+            line-height: 30px;
+            border: 1px solid #ccc;
+        }
+        .arrow {
+            display: inline-block;
+            font-size: 24px;
+            margin: 0 20px;
+            color: #666;
+        }
+        .input-section, .output-section {
+            margin: 20px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .stats {
+            margin-top: 20px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Run Length Encoding (RLE) Visualization</h2>
+        <div class="controls">
+            <button onclick="generateRandom()">Generate Random Sequence</button>
+            <button onclick="generateRepeating()">Generate Repeating Sequence</button>
+        </div>
+        <div class="input-section">
+            <h3>Input Data:</h3>
+            <div id="input"></div>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="output-section">
+            <h3>Compressed (RLE):</h3>
+            <div id="output"></div>
+        </div>
+        <div class="stats">
+            <h3>Compression Stats:</h3>
+            <div id="stats"></div>
+        </div>
+    </div>
+
+    <script>
+        function generateBoxes(data, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            if (containerId === 'input') {
+                // Display individual characters
+                for (let char of data) {
+                    const box = document.createElement('div');
+                    box.className = 'box';
+                    box.style.backgroundColor = char === '1' ? '#ff7675' : '#74b9ff';
+                    box.textContent = char;
+                    container.appendChild(box);
+                }
+            } else {
+                // Display RLE encoded data
+                let encoded = '';
+                let count = 1;
+                let current = data[0];
+                
+                for (let i = 1; i <= data.length; i++) {
+                    if (i < data.length && data[i] === current) {
+                        count++;
+                    } else {
+                        encoded += count + current;
+                        if (i < data.length) {
+                            current = data[i];
+                            count = 1;
+                        }
+                    }
+                }
+                
+                // Display encoded data
+                const parts = encoded.match(/\d+[01]/g);
+                for (let part of parts) {
+                    const box = document.createElement('div');
+                    box.className = 'box';
+                    box.style.backgroundColor = part.slice(-1) === '1' ? '#ff7675' : '#74b9ff';
+                    box.textContent = part;
+                    container.appendChild(box);
+                }
+                
+                // Update stats
+                const originalSize = data.length;
+                const compressedSize = encoded.length;
+                const compressionRatio = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
+                
+                document.getElementById('stats').innerHTML = `
+                    Original size: ${originalSize} bytes<br>
+                    Compressed size: ${compressedSize} bytes<br>
+                    Compression ratio: ${compressionRatio}%
+                `;
+            }
+        }
+
+        function generateRandom() {
+            const length = 20;
+            const data = Array.from({length}, () => Math.random() < 0.5 ? '0' : '1').join('');
+            generateBoxes(data, 'input');
+            generateBoxes(data, 'output');
+        }
+
+        function generateRepeating() {
+            const data = '11111000001111100000';
+            generateBoxes(data, 'input');
+            generateBoxes(data, 'output');
+        }
+
+        // Initialize with repeating sequence
+        generateRepeating();
+    </script>
+</body>
+</html>

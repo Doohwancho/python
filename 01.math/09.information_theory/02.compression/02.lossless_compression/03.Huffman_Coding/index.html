@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #canvas {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: white;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .stats {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 4px;
+        }
+        .example-select {
+            margin: 20px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        select {
+            padding: 5px;
+            margin-left: 10px;
+        }
+        .info {
+            margin: 10px 0;
+            padding: 10px;
+            background: #fff3e0;
+            border-radius: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Huffman Coding Visualization</h2>
+        
+        <div class="example-select">
+            <label>Select example text: </label>
+            <select id="exampleSelect" onchange="changeExample()">
+                <option value="simple">Simple Text (AABBBCCCC)</option>
+                <option value="english">English Text</option>
+                <option value="repeated">Highly Repetitive</option>
+            </select>
+        </div>
+
+        <div class="stats" id="stats"></div>
+        
+        <div class="controls">
+            <button onclick="nextStep()">Next Step</button>
+            <button onclick="reset()">Reset</button>
+        </div>
+
+        <canvas id="canvas" width="800" height="400"></canvas>
+
+        <div class="info" id="stepInfo">Click 'Next Step' to begin Huffman coding</div>
+
+        <table id="codeTable">
+            <thead>
+                <tr>
+                    <th>Character</th>
+                    <th>Frequency</th>
+                    <th>Huffman Code</th>
+                    <th>Bits Saved</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const examples = {
+            simple: "AABBBCCCC",
+            english: "this is an example of english text with some common letters",
+            repeated: "AAAAAAAAABBBBCCCD"
+        };
+
+        let input = examples.simple;
+        let currentStep = 0;
+        let huffmanTree = null;
+        let nodesToAnimate = [];
+        
+        class Node {
+            constructor(char, freq) {
+                this.char = char;
+                this.freq = freq;
+                this.left = null;
+                this.right = null;
+                this.x = 0;
+                this.y = 0;
+                this.code = '';
+            }
+        }
+
+        function countFrequencies(text) {
+            const freq = {};
+            for (let char of text) {
+                freq[char] = (freq[char] || 0) + 1;
+            }
+            return freq;
+        }
+
+        function buildHuffmanTree(frequencies) {
+            const nodes = Object.entries(frequencies).map(
+                ([char, freq]) => new Node(char, freq)
+            );
+
+            while (nodes.length > 1) {
+                nodes.sort((a, b) => a.freq - b.freq);
+                const left = nodes.shift();
+                const right = nodes.shift();
+                const parent = new Node(null, left.freq + right.freq);
+                parent.left = left;
+                parent.right = right;
+                nodes.push(parent);
+                nodesToAnimate.push({parent, left, right});
+            }
+
+            return nodes[0];
+        }
+
+        function assignCodes(node, code = '') {
+            if (!node) return;
+            
+            node.code = code;
+            if (node.char) {
+                node.finalCode = code;
+            }
+            
+            assignCodes(node.left, code + '0');
+            assignCodes(node.right, code + '1');
+        }
+
+        function calculateNodePositions(node, x = 400, y = 50, level = 0) {
+            if (!node) return;
+            
+            node.x = x;
+            node.y = y;
+            
+            const offset = 200 / (level + 1);
+            calculateNodePositions(node.left, x - offset, y + 60, level + 1);
+            calculateNodePositions(node.right, x + offset, y + 60, level + 1);
+        }
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        function drawNode(node, highlight = false) {
+            if (!node) return;
+
+            // Draw connections to children
+            if (node.left) {
+                ctx.beginPath();
+                ctx.moveTo(node.x, node.y);
+                ctx.lineTo(node.left.x, node.left.y);
+                ctx.strokeStyle = '#666';
+                ctx.stroke();
+                ctx.fillStyle = '#000';
+                ctx.fillText('0', (node.x + node.left.x) / 2 - 10, (node.y + node.left.y) / 2);
+            }
+            if (node.right) {
+                ctx.beginPath();
+                ctx.moveTo(node.x, node.y);
+                ctx.lineTo(node.right.x, node.right.y);
+                ctx.strokeStyle = '#666';
+                ctx.stroke();
+                ctx.fillStyle = '#000';
+                ctx.fillText('1', (node.x + node.right.x) / 2 + 10, (node.y + node.right.y) / 2);
+            }
+
+            // Draw node
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, 20, 0, Math.PI * 2);
+            ctx.fillStyle = highlight ? '#ffeb3b' : '#fff';
+            ctx.fill();
+            ctx.strokeStyle = '#333';
+            ctx.stroke();
+
+            // Draw node content
+            ctx.fillStyle = '#000';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = '14px Arial';
+            ctx.fillText(node.char || node.freq, node.x, node.y);
+        }
+
+        function drawTree() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw all nodes and connections
+            function traverse(node) {
+                if (!node) return;
+                drawNode(node);
+                traverse(node.left);
+                traverse(node.right);
+            }
+            
+            if (huffmanTree) {
+                traverse(huffmanTree);
+            }
+        }
+
+        function updateStats() {
+            if (!huffmanTree) return;
+
+            let originalBits = input.length * 8;
+            let compressedBits = 0;
+            const codes = {};
+
+            function traverse(node) {
+                if (!node) return;
+                if (node.char && node.finalCode) {
+                    codes[node.char] = node.finalCode;
+                }
+                traverse(node.left);
+                traverse(node.right);
+            }
+            traverse(huffmanTree);
+
+            for (let char of input) {
+                compressedBits += codes[char].length;
+            }
+
+            const ratio = ((originalBits - compressedBits) / originalBits * 100).toFixed(1);
+            
+            document.getElementById('stats').innerHTML = `
+                Original size: ${originalBits} bits<br>
+                Compressed size: ${compressedBits} bits<br>
+                Compression ratio: ${ratio}% saved<br>
+                Input text: "${input}"
+            `;
+
+            // Update code table
+            const tbody = document.getElementById('codeTable').getElementsByTagName('tbody')[0];
+            tbody.innerHTML = '';
+            
+            for (let [char, code] of Object.entries(codes)) {
+                const row = tbody.insertRow();
+                row.insertCell(0).textContent = char;
+                row.insertCell(1).textContent = countFrequencies(input)[char];
+                row.insertCell(2).textContent = code;
+                const bitsSaved = (8 - code.length) * countFrequencies(input)[char];
+                row.insertCell(3).textContent = bitsSaved + ' bits';
+            }
+        }
+
+        function nextStep() {
+            if (currentStep === 0) {
+                const frequencies = countFrequencies(input);
+                huffmanTree = buildHuffmanTree(frequencies);
+                assignCodes(huffmanTree);
+                calculateNodePositions(huffmanTree);
+                currentStep++;
+                document.getElementById('stepInfo').textContent = 'Building Huffman tree...';
+            } else if (nodesToAnimate.length > 0) {
+                const {parent, left, right} = nodesToAnimate.shift();
+                drawTree();
+                drawNode(parent, true);
+                drawNode(left, true);
+                drawNode(right, true);
+                updateStats();
+            } else {
+                document.getElementById('stepInfo').textContent = 'Huffman tree complete!';
+            }
+        }
+
+        function changeExample() {
+            input = examples[document.getElementById('exampleSelect').value];
+            reset();
+        }
+
+        function reset() {
+            currentStep = 0;
+            huffmanTree = null;
+            nodesToAnimate = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('stepInfo').textContent = 'Click \'Next Step\' to begin Huffman coding';
+            document.getElementById('stats').innerHTML = '';
+            document.getElementById('codeTable').getElementsByTagName('tbody')[0].innerHTML = '';
+        }
+
+        // Initialize
+        reset();
+    </script>
+</body>
+</html>

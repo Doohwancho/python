@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .window {
+            display: flex;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 18px;
+        }
+        .search-buffer, .look-ahead {
+            display: flex;
+            align-items: flex-start;
+            flex-direction: column;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .search-buffer {
+            background: #e8f5e9;
+            margin-right: 2px;
+            min-width: 400px;
+        }
+        .look-ahead {
+            background: #e3f2fd;
+            min-width: 200px;
+        }
+        .char-box {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            margin: 2px;
+            text-align: center;
+            line-height: 30px;
+            border: 1px solid #ccc;
+            background: white;
+        }
+        .match {
+            background: #ffeb3b;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .output {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .token {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 5px;
+            background: #e9ecef;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .stats {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .example-select {
+            margin: 20px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        select {
+            padding: 5px;
+            margin-left: 10px;
+            font-size: 16px;
+        }
+        .highlight {
+            background: #fff59d;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>LZ77 Compression - Optimal Use Cases</h2>
+        
+        <div class="example-select">
+            <label>Select example text: </label>
+            <select id="exampleSelect" onchange="changeExample()">
+                <option value="repeated">Repeated Pattern</option>
+                <option value="dna">DNA Sequence</option>
+                <option value="log">Log File</option>
+                <option value="html">HTML Table</option>
+            </select>
+        </div>
+
+        <div class="stats" id="stats"></div>
+
+        <div class="controls">
+            <button onclick="nextStep()">Next Step</button>
+            <button onclick="reset()">Reset</button>
+            <button onclick="compressAll()">Complete Compression</button>
+        </div>
+
+        <div class="window">
+            <div class="search-buffer">
+                <div>Search Buffer (Dictionary)</div>
+                <div id="searchContent"></div>
+            </div>
+            <div class="look-ahead">
+                <div>Look-ahead Buffer</div>
+                <div id="lookAheadContent"></div>
+            </div>
+        </div>
+
+        <div class="output">
+            <h3>Output Tokens:</h3>
+            <div id="output"></div>
+        </div>
+    </div>
+
+    <script>
+        const examples = {
+            repeated: "ABCDEABCDEABCDEABCDEABCDEABCDEABCDEABCDE",
+            dna: "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG",
+            log: "[ERROR] Connection failed\n[ERROR] Connection failed\n[ERROR] Connection failed\n[ERROR] Connection failed",
+            html: "<tr><td>Data 1</td><td>Value 1</td></tr><tr><td>Data 2</td><td>Value 2</td></tr><tr><td>Data 3</td><td>Value 3</td></tr>"
+        };
+
+        let input = examples.repeated;
+        let currentPos = 0;
+        let tokens = [];
+        const windowSize = 30;
+        const lookAheadSize = 15;
+
+        function calculateCompression() {
+            const originalSize = input.length;
+            const compressedSize = tokens.length * 3; // 3 bytes per token
+            const ratio = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
+            
+            let explanation = "";
+            switch(document.getElementById('exampleSelect').value) {
+                case 'repeated':
+                    explanation = "Perfect for LZ77: 5-character pattern (ABCDE) repeated 8 times";
+                    break;
+                case 'dna':
+                    explanation = "DNA sequences often contain repeated patterns of ATCG";
+                    break;
+                case 'log':
+                    explanation = "Log files often contain identical lines repeated many times";
+                    break;
+                case 'html':
+                    explanation = "HTML has repetitive structure with tags and similar content";
+                    break;
+            }
+
+            document.getElementById('stats').innerHTML = `
+                <strong>Original size:</strong> ${originalSize} bytes<br>
+                <strong>Compressed size:</strong> ${compressedSize} bytes<br>
+                <strong>Compression ratio:</strong> <span class="highlight">${ratio}% saved</span><br>
+                <br>
+                <strong>Why this works well:</strong> ${explanation}<br>
+                <br>
+                <strong>Original text:</strong> "${input.length > 50 ? input.slice(0, 47) + '...' : input}"
+            `;
+        }
+
+        function findLongestMatch(searchBuffer, lookAhead) {
+            let maxLength = 0;
+            let offset = 0;
+            
+            for (let i = 0; i < searchBuffer.length; i++) {
+                let currentLength = 0;
+                while (i + currentLength < searchBuffer.length && 
+                       currentLength < lookAhead.length && 
+                       searchBuffer[i + currentLength] === lookAhead[currentLength]) {
+                    currentLength++;
+                }
+                if (currentLength > maxLength) {
+                    maxLength = currentLength;
+                    offset = searchBuffer.length - i;
+                }
+            }
+            return { offset, length: maxLength };
+        }
+
+        function createCharBox(char, isMatch = false) {
+            const box = document.createElement('div');
+            box.className = `char-box${isMatch ? ' match' : ''}`;
+            box.textContent = char === '\n' ? '⏎' : char;
+            return box;
+        }
+
+        function updateDisplay() {
+            const searchContent = document.getElementById('searchContent');
+            const lookAheadContent = document.getElementById('lookAheadContent');
+            searchContent.innerHTML = '';
+            lookAheadContent.innerHTML = '';
+
+            const searchBuffer = input.slice(Math.max(0, currentPos - windowSize), currentPos);
+            const lookAhead = input.slice(currentPos, currentPos + lookAheadSize);
+            const match = findLongestMatch(searchBuffer, lookAhead);
+
+            for (let char of searchBuffer) {
+                searchContent.appendChild(createCharBox(char));
+            }
+
+            for (let i = 0; i < lookAhead.length; i++) {
+                const isMatch = i < match.length;
+                lookAheadContent.appendChild(createCharBox(lookAhead[i], isMatch));
+            }
+
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML = tokens.map(token => 
+                `<span class="token">(${token.offset}, ${token.length}, ${token.nextChar})</span>`
+            ).join('');
+
+            calculateCompression();
+        }
+
+        function nextStep() {
+            if (currentPos >= input.length) return;
+
+            const searchBuffer = input.slice(Math.max(0, currentPos - windowSize), currentPos);
+            const lookAhead = input.slice(currentPos, currentPos + lookAheadSize);
+            const match = findLongestMatch(searchBuffer, lookAhead);
+
+            tokens.push({
+                offset: match.offset,
+                length: match.length,
+                nextChar: input[currentPos + match.length] || ''
+            });
+
+            currentPos += match.length + 1;
+            updateDisplay();
+        }
+
+        function compressAll() {
+            while (currentPos < input.length) {
+                nextStep();
+            }
+        }
+
+        function changeExample() {
+            const selected = document.getElementById('exampleSelect').value;
+            input = examples[selected];
+            reset();
+        }
+
+        function reset() {
+            currentPos = 0;
+            tokens = [];
+            updateDisplay();
+        }
+
+        // Initialize
+        updateDisplay();
+    </script>
+</body>
+</html>

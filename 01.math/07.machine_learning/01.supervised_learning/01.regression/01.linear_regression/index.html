@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { 
+            margin: 0; 
+            background: black; 
+            color: white; 
+            font-family: monospace;
+            overflow: hidden;
+        }
+        canvas { 
+            display: block; 
+        }
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        #explanation {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 400px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            background: #444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #666;
+        }
+        .math {
+            font-family: "Times New Roman", serif;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="controls">
+        <button onclick="prevStep()">Previous Step</button>
+        <button onclick="nextStep()">Next Step</button>
+        <button onclick="toggleAnimation()">Play/Pause</button>
+    </div>
+    <div id="explanation"></div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const explanationDiv = document.getElementById('explanation');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let currentStep = 1;
+        let isAnimating = false;
+        let time = 0;
+        let rawData = [];
+        let normalizedData = [];
+        let weights = [];
+        let learningRate = 0.1;
+        let epoch = 0;
+        let predictions = [];
+        let loss = [];
+
+        // Generate random data with a pattern
+        function generateData() {
+            rawData = [];
+            for(let i = 0; i < 50; i++) {
+                const x = Math.random() * 10 - 5;
+                const y = 2 * x + 1 + (Math.random() - 0.5) * 2;
+                rawData.push([x, y]);
+            }
+        }
+
+        // Normalize data
+        function normalizeData() {
+            const xValues = rawData.map(d => d[0]);
+            const yValues = rawData.map(d => d[1]);
+            
+            const xMean = xValues.reduce((a,b) => a + b) / xValues.length;
+            const yMean = yValues.reduce((a,b) => a + b) / yValues.length;
+            
+            const xStd = Math.sqrt(xValues.map(x => (x - xMean)**2).reduce((a,b) => a + b) / xValues.length);
+            const yStd = Math.sqrt(yValues.map(y => (y - yMean)**2).reduce((a,b) => a + b) / yValues.length);
+            
+            normalizedData = rawData.map(d => [
+                (d[0] - xMean) / xStd,
+                (d[1] - yMean) / yStd
+            ]);
+        }
+
+        function toScreen(x, y) {
+            return {
+                x: canvas.width/2 + x * 50,
+                y: canvas.height/2 - y * 50
+            };
+        }
+
+        function drawAxes() {
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 1;
+            
+            // Grid
+            for(let i = -10; i <= 10; i++) {
+                const start = toScreen(i, -10);
+                const end = toScreen(i, 10);
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+
+                const start2 = toScreen(-10, i);
+                const end2 = toScreen(10, i);
+                ctx.beginPath();
+                ctx.moveTo(start2.x, start2.y);
+                ctx.lineTo(end2.x, end2.y);
+                ctx.stroke();
+            }
+
+            // Axes
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 2;
+            const origin = toScreen(0, 0);
+            
+            ctx.beginPath();
+            ctx.moveTo(toScreen(-10, 0).x, toScreen(-10, 0).y);
+            ctx.lineTo(toScreen(10, 0).x, toScreen(10, 0).y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(toScreen(0, -10).x, toScreen(0, -10).y);
+            ctx.lineTo(toScreen(0, 10).x, toScreen(0, 10).y);
+            ctx.stroke();
+        }
+
+        function drawDataPoints(data, color = '#4488ff') {
+            ctx.fillStyle = color;
+            data.forEach(point => {
+                const screen = toScreen(point[0], point[1]);
+                ctx.beginPath();
+                ctx.arc(screen.x, screen.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function drawStep1() {
+            // Raw data visualization
+            drawDataPoints(rawData);
+            
+            explanationDiv.innerHTML = `
+                <h2>Step 1: Raw Data</h2>
+                <p>Starting with raw data points (x, y) that show some linear pattern with noise.</p>
+                <div class="math">
+                    Data point: (x, y)<br>
+                    Pattern: y ≈ 2x + 1 + noise
+                </div>
+                <p>This represents our input data that we want to model.</p>
+                <p><strong>Linear Algebra:</strong> Each point can be represented as a vector [x, y].</p>
+                <p><strong>Statistics:</strong> The data follows a distribution with noise.</p>
+            `;
+        }
+
+        function drawStep2() {
+            // Show normalized data
+            drawDataPoints(rawData, 'rgba(68, 136, 255, 0.2)');
+            drawDataPoints(normalizedData, '#44ff88');
+            
+            explanationDiv.innerHTML = `
+                <h2>Step 2: Data Normalization</h2>
+                <p>Normalize data by subtracting mean and dividing by standard deviation.</p>
+                <div class="math">
+                    x' = (x - μₓ) / σₓ<br>
+                    y' = (y - μᵧ) / σᵧ
+                </div>
+                <p><strong>Statistics:</strong> Standardizing to N(0,1) distribution.</p>
+                <p><strong>Linear Algebra:</strong> Data transformation using matrix operations.</p>
+                <ul>
+                    <li>Blue: Original data</li>
+                    <li>Green: Normalized data</li>
+                </ul>
+            `;
+        }
+
+        function drawStep3() {
+            // Matrix representation
+            drawDataPoints(normalizedData, '#44ff88');
+            
+            // Show matrix
+            const matrixX = canvas.width/2 + 150;
+            const matrixY = canvas.height/2 - 100;
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '14px monospace';
+            
+            ctx.fillText('X = [', matrixX, matrixY);
+            for(let i = 0; i < 5; i++) {
+                const point = normalizedData[i];
+                ctx.fillText(
+                    `[${point[0].toFixed(2)}, ${point[1].toFixed(2)}]`,
+                    matrixX + 30,
+                    matrixY + i * 20
+                );
+            }
+            ctx.fillText('...]', matrixX + 30, matrixY + 100);
+            
+            explanationDiv.innerHTML = `
+                <h2>Step 3: Matrix Representation</h2>
+                <p>Organize data into matrix form for efficient computation.</p>
+                <div class="math">
+                    X = [x₁, x₂, ..., xₙ]ᵀ<br>
+                    y = [y₁, y₂, ..., yₙ]ᵀ
+                </div>
+                <p><strong>Linear Algebra:</strong> Matrix operations enable:</p>
+                <ul>
+                    <li>Efficient computations</li>
+                    <li>Batch processing</li>
+                    <li>Feature transformations</li>
+                </ul>
+            `;
+        }
+
+        function drawStep4() {
+            drawDataPoints(normalizedData, '#44ff88');
+            
+            // Show gradient descent animation
+            if(isAnimating) {
+                epoch++;
+                const w = epoch * 0.02;
+                const b = epoch * 0.01;
+                
+                // Draw prediction line
+                ctx.strokeStyle = '#ff4444';
+                ctx.lineWidth = 2;
+                const x1 = -3;
+                const x2 = 3;
+                const y1 = w * x1 + b;
+                const y2 = w * x2 + b;
+                
+                const start = toScreen(x1, y1);
+                const end = toScreen(x2, y2);
+                
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+
+                // Show gradient vectors
+                normalizedData.forEach(point => {
+                    const pred = w * point[0] + b;
+                    const error = pred - point[1];
+                    const gradW = error * point[0];
+                    const gradB = error;
+                    
+                    const pos = toScreen(point[0], pred);
+                    
+                    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                    ctx.beginPath();
+                    ctx.moveTo(pos.x, pos.y);
+                    ctx.lineTo(pos.x - gradW * 10, pos.y - gradB * 10);
+                    ctx.stroke();
+                });
+            }
+            
+            explanationDiv.innerHTML = `
+                <h2>Step 4: Gradient Descent</h2>
+                <p>Optimize model parameters using calculus.</p>
+                <div class="math">
+                    Loss = Σ(y - ŷ)²<br>
+                    ∂Loss/∂w = -2Σ(y - ŷ)x<br>
+                    ∂Loss/∂b = -2Σ(y - ŷ)
+                </div>
+                <p><strong>Calculus:</strong> Compute gradients to minimize loss.</p>
+                <p><strong>Linear Algebra:</strong> Matrix operations for batch updates.</p>
+                <p><strong>Statistics:</strong> Loss function based on error distribution.</p>
+                <ul>
+                    <li>Red line: Current prediction</li>
+                    <li>White arrows: Gradient direction</li>
+                </ul>
+            `;
+        }
+
+        function drawStep5() {
+            drawDataPoints(normalizedData, '#44ff88');
+            
+            // Show final model and confidence intervals
+            const w = 0.8;
+            const b = 0;
+            
+            // Draw prediction line
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            const x1 = -3;
+            const x2 = 3;
+            const y1 = w * x1 + b;
+            const y2 = w * x2 + b;
+            
+            const start = toScreen(x1, y1);
+            const end = toScreen(x2, y2);
+            
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+
+            // Draw confidence intervals
+            ctx.fillStyle = 'rgba(255, 68, 68, 0.1)';
+            ctx.beginPath();
+            ctx.moveTo(toScreen(x1, y1 + 0.5).x, toScreen(x1, y1 + 0.5).y);
+            ctx.lineTo(toScreen(x2, y2 + 0.5).x, toScreen(x2, y2 + 0.5).y);
+            ctx.lineTo(toScreen(x2, y2 - 0.5).x, toScreen(x2, y2 - 0.5).y);
+            ctx.lineTo(toScreen(x1, y1 - 0.5).x, toScreen(x1, y1 - 0.5).y);
+            ctx.closePath();
+            ctx.fill();
+            
+            explanationDiv.innerHTML = `
+                <h2>Step 5: Final Model & Analysis</h2>
+                <p>Evaluate model with statistical measures.</p>
+                <div class="math">
+                    ŷ = wx + b<br>
+                    R² = 1 - Σ(y - ŷ)²/Σ(y - ȳ)²
+                </div>
+                <p><strong>Statistics:</strong></p>
+                <ul>
+                    <li>Confidence intervals</li>
+                    <li>R-squared value</li>
+                    <li>Prediction uncertainty</li>
+                </ul>
+                <p><strong>Result:</strong></p>
+                <ul>
+                    <li>Red line: Model prediction</li>
+                    <li>Pink area: Confidence interval</li>
+                    <li>Green points: Normalized data</li>
+                </ul>
+            `;
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawAxes();
+
+            switch(currentStep) {
+                case 1: drawStep1(); break;
+                case 2: drawStep2(); break;
+                case 3: drawStep3(); break;
+                case 4: drawStep4(); break;
+                case 5: drawStep5(); break;
+            }
+        }
+
+        function nextStep() {
+            currentStep = Math.min(currentStep + 1, 5);
+            epoch = 0;
+            draw();
+        }
+
+        function prevStep() {
+            currentStep = Math.max(currentStep - 1, 1);
+            epoch = 0;
+            draw();
+        }
+
+        function toggleAnimation() {
+            isAnimating = !isAnimating;
+            if(isAnimating) animate();
+        }
+
+        function animate() {
+            if(isAnimating) {
+                time += 0.02;
+                draw();
+                requestAnimationFrame(animate);
+            }
+        }
+
+        function init() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            generateData();
+            normalizeData();
+            draw();
+        }
+
+        // Event listeners
+        window.addEventListener('resize', init);
+        document.addEventListener('keydown', e => {
+            switch(e.key) {
+                case 'ArrowRight': nextStep(); break;
+                case 'ArrowLeft': prevStep(); break;
+                case ' ': toggleAnimation(); break;
+            }
+        });
+
+        // Start visualization
+        init();
+    </script>
+</body>
+</html>

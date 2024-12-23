@@ -1,24 +1,20 @@
 # A. Meta
 
 ## a. key to effectively learning
-
----
-goal
+### a-1. goal
 
 build a vector map\
 전체 다 100% 이해하는게 아니라, 중요부분 위주로 큰 그림 파악하는 것.\
 요리로 비유하면 요리를 미리 다 해놓는게 아니라, 중요 부분만 반조리 해 놓고 저장해 놓는 것.\
 개발로 치면 뼈대 library module을 여러개 수집해 놓는 것.
 
----
-How
+### a-2. How
 
 1. build core branch from core root
 2. add a few core concepts to each branch
 3. add details to each concepts, connect concepts with each other by relating
 
----
-오해
+### a-3. 오해
 
 1. you are an engineer, not researcher or scholar. you don't need details of what and why. you just need how and little bit of what & why just enough to understand concepts and twig a little
 2. you're not trying to load every concepts of calculus/algebra/statistics to your brain. you only need ones used for machine learning.
@@ -96,54 +92,13 @@ build vector map of math for machine learning bottom up
 # C. Subjects
 
 
-a. number_theory
-
-1. pi
-2. 복소수
-	1. i
-		1. euler's formula
-		2. fourier_transformation
-	2. real_number
-3. log & exponential
-	1. log
-	2. exponential
-4. e
-5. quaternion
-
-b. geometry
-
-1. trigonometry
-	1. fundamental trig functions
-2. interactive_design
-	1. sin cos tan
-	2. node garden
-3. 3d
-
+a. number_theory\
+b. geometry\
 c. calculus\
 d. algebra\
 e. statistics\
 f. physics\
-g. machine_learning
-
-1. sp(supervised_learning)
-	1. reg(regression)
-		1. linear_regression
-		2. overfitting_and_regularization
-		3. gradient_descent
-	2. cls(classification)
-		1. logistic_regression
-		2. SVM
-		3. decision_tree
-		4. KNN
-			1. recommendation_system
-2. us(unsupservised_learning)
-	1. cl(clustering)
-		1. k_means_clustering
-	2. dr(dimension_reduction)
-		1. PCA
-	3. ad(anomaly_detection)
-3. rl(reinforcement_learning)
-
+g. machine_learning\
 h. deep_learning\
 i. information_theory\
 j. algorithm
@@ -153,21 +108,127 @@ j. algorithm
 
 # D. Concepts
 
+- a. number_theory
+	- pi
+	- 복소수
+		- i
+			1. euler's formula
+				1. a-1. euler's formula on imaginary number :white_check_mark:\
+				2. a-2. 허수와 euler's formula를 이용한 2차원 벡터, object 회전 :white_check_mark:\
+			2. fourier_transformation
+				1. b-6. wave :white_check_mark:\
+				2. b-7. 푸리에변환 :white_check_mark:\
+				3. b-8. 푸리에변환으로 audio 유효 Hz(주파수) visualize :white_check_mark:\
+				4. b-9. 푸리에변환으로 image compression :white_check_mark:
+		- real_number
+	- log & exponential
+		- log
+		- exponential
+	- e
+		1. a-4. e :white_check_mark:
+	- quaternion
+- b. geometry
+	1. trigonometry
+		1. fundamental trig functions
+			1. b-1. sin cos tan :white_check_mark:\
+			2. b-2. sin cos tan + sec csc cot :white_check_mark:\
+			3. b-3. sin cos tan + sec csc cot with animation :white_check_mark:\
+			4. b-4. perpendicular line to the point on circle :white_check_mark:\
+			5. b-5. fundamental trig model :white_check_mark:\
+	2. interactive_design
+		1. sin cos tan
+		2. node garden
+	3. 3d
+- c. calculus
+	1. single variable calculus
+	2. multi variable calculus
+	3. differential equations
+	4. analysis
+	5. applied calculus
+		- local min max
+			- gradient
+			- lagrangian
+		- 곡선의 직선화
+- d. algebra
+	1. 기초대수학
+	2. data in dimention
+		1. 0차원_point
+		2. 1차원_scalar
+		3. 2차원_vector
+		4. 3차원_matrix
+		5. 4차원_tensor
+	3. spaces
+		1. rowspace & null_space
+		2. 아핀공간
+		3. dual space
+		4. eigen_theory
+	4. decomposition
+		1. eigen_decomposition
+		2. pca
+		3. svd
+	5. application
+	6. bridegs
+	-summary
+- e. statistics
+	1. 확률변수
+	2. descriptive_statistics
+		1. distributions
+		2. moments_로_분포설명
+	    3. laws
+	2. inferential_statistics
+		1. confidence_intervals
+		2. hypothesis_testing
+		3. test_for_comparison
+	3. relationship_between_vars
+		1. covariance
+		2. regression
+		3. correlation_coefficient
+		4. ANOVA(analysis_of_multiple_groups)
+	4. probability_based_modeling
+		1. baysian_statistics
+	5. test_resample_validate_data
+	6. specific_fields_application
+	7. ml
+	8. probability_theory
+		1. permutation_combination
+- f. physics
+	1. force
+		1. sin cos
+		2. vector
+		3. gravity
+		4. acceleration
+		5. friction
+		6. bounce
+		7. spring
+		8. collision detection
+		9. curves
+		10. kinematic
+	2. electric
+		1. light
+- g. machine_learning
+	1. sp(supervised_learning)
+		1. reg(regression)
+			1. linear_regression
+			2. overfitting_and_regularization
+			3. gradient_descent
+		2. cls(classification)
+			1. logistic_regression
+			2. SVM
+			3. decision_tree
+			4. KNN
+	2. us(unsupservised_learning)
+		1. cl(clustering)
+			1. k_means_clustering
+		2. dr(dimension_reduction)
+			1. PCA
+		3. ad(anomaly_detection)
+		4. applied
+			1. recommendation_system
+				1. g-ml-usp-rec-1.collaborative filtering approach :white_check_mark:
+				2. g-ml-usp-rec-2.content based filtering approach (영화 장르+태그를 TF-IDF로 묶어 벡터화한걸 영화끼리 유사도 비교) :white_check_mark:
+	3. rl(reinforcement_learning)
+- h. deep_learning
+- i. information_theory
+- j. algorithm
 
-a-1. euler's formula on imaginary number :white_check_mark:\
-a-2. 허수와 euler's formula를 이용한 2차원 벡터, object 회전 :white_check_mark:\
-a-3. log & exponential function are inverse :white_check_mark:\
-a-4. e :white_check_mark:
 
-b-1. sin cos tan :white_check_mark:\
-b-2. sin cos tan + sec csc cot :white_check_mark:\
-b-3. sin cos tan + sec csc cot with animation :white_check_mark:\
-b-4. perpendicular line to the point on circle :white_check_mark:\
-b-5. fundamental trig model :white_check_mark:\
-b-6. wave :white_check_mark:\
-b-7. 푸리에변환 :white_check_mark:\
-b-8. 푸리에변환으로 audio 유효 Hz(주파수) visualize :white_check_mark:\
-b-9. 푸리에변환으로 image compression :white_check_mark:
-
-g-ml-sp-cls-knn-rec-1.collaborative filtering approach :white_check_mark:\
-g-ml-sp-cls-knn-rec-2.content based filtering approach (영화 장르+태그를 TF-IDF로 묶어 벡터화한걸 영화끼리 유사도 비교) :white_check_mark:

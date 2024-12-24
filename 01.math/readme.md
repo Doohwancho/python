@@ -182,6 +182,7 @@ j. algorithm
 	3. relationship_between_vars
 		1. covariance
 		2. 피어슨 correlation_coefficient
+			1. titanic에서 죽음과 다른 변수들의 상관관계를 피어슨으로 분석해서 젤 연관있는 변수 뽑기
 		3. regression
 		4. ANOVA(special type of regression on analysis_of_multiple_groups)
 	4. probability_based_modeling

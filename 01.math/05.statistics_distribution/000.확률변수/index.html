@@ -146,7 +146,7 @@
 
             value.innerHTML = `
                 Discrete Random Variable (동전 던지기)<br>
-                PMF (Probability Mass Function)<br>
+                PMF (Probability Mass Function) <확률 질량><br>
                 P(X=0) = 0.5 (Tail)<br>
                 P(X=1) = 0.5 (Head)<br>
                 Σ P(X) = 1
@@ -171,7 +171,7 @@
 
             value.innerHTML = `
                 Discrete Random Variable (주사위)<br>
-                PMF (Probability Mass Function)<br>
+                PMF (Probability Mass Function) <확률 질량><br>
                 P(X=i) = 1/6 for i=1,2,3,4,5,6<br>
                 Σ P(X) = 1
             `;
@@ -228,7 +228,7 @@
                 const x = mean + mouse.x;
                 value.innerHTML = `
                     Continuous Random Variable (키)<br>
-                    PDF (Probability Density Function)<br>
+                    PDF (Probability Density Function) <확률 밀도><br>
                     Height ≈ ${x.toFixed(1)}cm<br>
                     P(${(x-10).toFixed(1)} ≤ X ≤ ${(x+10).toFixed(1)})<br>
                     = ∫ f(x)dx ≈ ${(0.4 * Math.exp(-Math.pow(mouse.x/10, 2)/2)).toFixed(3)}
@@ -236,7 +236,7 @@
             } else {
                 value.innerHTML = `
                     Continuous Random Variable (키)<br>
-                    PDF (Probability Density Function)<br>
+                    PDF (Probability Density Function) <확률 밀도><br>
                     Move mouse to see probabilities<br>
                     ∫f(x)dx = 1 (total probability)
                 `;

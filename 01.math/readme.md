@@ -113,13 +113,13 @@ j. algorithm
 	- 복소수
 		- i
 			1. euler's formula
-				1. a-1. euler's formula on imaginary number :white_check_mark:\
-				2. a-2. 허수와 euler's formula를 이용한 2차원 벡터, object 회전 :white_check_mark:\
+				1. euler's formula on imaginary number :white_check_mark:
+				2. 허수와 euler's formula를 이용한 2차원 벡터, object 회전 :white_check_mark:
 			2. fourier_transformation
-				1. b-6. wave :white_check_mark:\
-				2. b-7. 푸리에변환 :white_check_mark:\
-				3. b-8. 푸리에변환으로 audio 유효 Hz(주파수) visualize :white_check_mark:\
-				4. b-9. 푸리에변환으로 image compression :white_check_mark:
+				1. wave :white_check_mark:
+				2. 푸리에변환 :white_check_mark:
+				3. 푸리에변환으로 audio 유효 Hz(주파수) visualize :white_check_mark:
+				4. 푸리에변환으로 image compression :white_check_mark:
 		- real_number
 	- log & exponential
 		- log
@@ -130,11 +130,11 @@ j. algorithm
 - b. geometry
 	1. trigonometry
 		1. fundamental trig functions
-			1. b-1. sin cos tan :white_check_mark:\
-			2. b-2. sin cos tan + sec csc cot :white_check_mark:\
-			3. b-3. sin cos tan + sec csc cot with animation :white_check_mark:\
-			4. b-4. perpendicular line to the point on circle :white_check_mark:\
-			5. b-5. fundamental trig model :white_check_mark:\
+			1. sin cos tan :white_check_mark:
+			2. sin cos tan + sec csc cot :white_check_mark:
+			3. sin cos tan + sec csc cot with animation :white_check_mark:
+			4. perpendicular line to the point on circle :white_check_mark:
+			5. fundamental trig model :white_check_mark:
 	2. interactive_design
 		1. sin cos tan
 		2. node garden
@@ -167,23 +167,23 @@ j. algorithm
 		2. pca
 		3. svd
 	5. application
-	6. bridegs
-	-summary
+	6. bridges
+	7. summary
 - e. statistics
 	1. 확률변수
 	2. descriptive_statistics
 		1. distributions
 		2. moments_로_분포설명
-	    3. laws
+		3. laws
 	2. inferential_statistics
 		1. confidence_intervals
 		2. hypothesis_testing
 		3. test_for_comparison
 	3. relationship_between_vars
 		1. covariance
-		2. regression
-		3. correlation_coefficient
-		4. ANOVA(analysis_of_multiple_groups)
+		2. 피어슨 correlation_coefficient
+		3. regression
+		4. ANOVA(special type of regression on analysis_of_multiple_groups)
 	4. probability_based_modeling
 		1. baysian_statistics
 	5. test_resample_validate_data

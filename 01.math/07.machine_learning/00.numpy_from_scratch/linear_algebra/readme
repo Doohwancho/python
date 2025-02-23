@@ -1,0 +1,34 @@
+---
+summary
+
+
+1. Basic Matrix Operations (Matrix class)
+    - Matrix addition, subtraction, multiplication
+    - Element-wise operations
+    - Transpose operation
+    - Matrix-vector multiplication
+2. Matrix Decompositions
+    - SVD (Singular Value Decomposition)
+        - Decomposes matrix A into U∑Vᵀ
+        - Used for PCA, dimensionality reduction
+    - LU Decomposition with Pivoting
+        - Decomposes matrix A into LU where L is lower triangular and U is upper triangular
+        - Useful for solving linear systems
+    - Gram-Schmidt Orthogonalization
+        - Converts a set of vectors into orthogonal vectors
+        - Used in QR decomposition
+3. Special Matrix Types
+    - Sparse Matrix (CSR format)
+        - Efficient storage for matrices with many zeros
+        - Specialized operations for sparse data
+4. PCA (Principal Component Analysis)
+    - Uses SVD for dimensionality reduction
+        - Finds principal components of data
+        - Computes explained variance ratios
+
+
+---
+Each of these components builds on the others:
+
+
+- PCA uses SVD

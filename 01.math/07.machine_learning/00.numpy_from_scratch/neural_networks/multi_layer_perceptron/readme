@@ -1,0 +1,321 @@
+---
+Q. directory 구조? 
+
+1. layers/ 
+2. activation_functions/
+3. loss_functions/
+
+
+
+---
+Q. what is layers?
+
+
+neural network의 각 레이어다. 
+
+```python
+# Create network
+network = NeuralNetwork(
+    layers=[
+        # 입력층 -> 첫 번째 은닉층
+        Dense(input_size=2, output_size=4, activation=ReLU()),
+        BatchNormalization(input_size=4), # 학습 안정화
+        
+        # 두 번째 은닉층 (여러 은닉층 있는 이유는 complex한거 학습하려고)
+        Dense(input_size=4, output_size=3, activation=ReLU()),
+        Dropout(dropout_rate=0.2), # overfitting 방지 
+        
+        # 출력층
+        Dense(input_size=3, output_size=1, activation=Sigmoid())
+    ],
+    loss=MSELoss()
+)
+```
+
+
+files
+```
+1. layer.py: Base class for all layers
+2. dense.py: Fully connected layer (main computation layer)
+3. batch_normalization.py: Normalizes layer inputs (helps training)
+4. dropout.py: Randomly deactivates neurons (prevents overfitting)
+5. ReLu_layer.py, sigmoid_layer.py: Layer versions of activation functions
+```
+
+
+
+---
+Q. what is activation functions?
+
+
+Activation function은
+neural network의 각 layer 속에 있는 node들이 
+숫자 신호를 전파 받았을 때, 
+뉴런(노드)이 얼마나 '활성화'될지를 결정하는 함수
+
+
+ex. 
+1. Sigmoid (σ(x) = 1/(1 + e^(-x)))
+    - 출력이 0~1 사이
+    - 초기 뉴럴 네트워크에서 많이 사용
+    - 문제점: Gradient vanishing 현상 발생
+    - 생물학적 뉴런의 활성화와 비슷해서 초기에 채택됨
+2. ReLU (max(0,x))
+    - 0보다 작으면 0, 크면 그대로
+    - 계산이 매우 단순
+    - Gradient vanishing 문제 해결
+    - 현대 딥러닝에서 가장 많이 사용
+    - 완전히 수학적인 접근으로, 생물학적 근거 없음
+3. Tanh (tanh(x))
+    - 출력이 -1~1 사이
+    - Sigmoid의 대체제로 등장
+    - Sigmoid보다 gradient vanishing이 덜함
+
+
+
+---
+Q. ReLu가 neural network에 각 layer에 각 node에서 어떻게 처리됨?
+
+A. 
+1. 입력 행렬이 이렇다고 가정,
+input_matrix = Matrix([
+    [ 1.2, -0.5,  0.8],
+    [-2.0,  3.1, -0.7],
+    [ 0.0,  1.5, -1.0]
+])
+
+2. ReLU forward 적용 후
+output_matrix = Matrix([
+    [1.2, 0.0, 0.8],  # -0.5 -> 0
+    [0.0, 3.1, 0.0],  # -2.0, -0.7 -> 0
+    [0.0, 1.5, 0.0]   # -1.0 -> 0
+])
+
+3. ReLU backward (미분) 적용 후
+gradient_matrix = Matrix([
+    [1, 0, 1],  # 양수였던 곳 -> 1
+    [0, 1, 0],  # 음수였던 곳 -> 0
+    [0, 1, 0]
+])
+
+
+
+---
+Q. what is Dense.py? (each layer from neural network?)
+
+
+neural network은 각 레이어(이 경우 3개)있잖아?
+각 레이어가 Dense.py임. 
+
+
+part1. init 
+    - weights: 각 입력 노드와 출력 노드 사이의 연결 강도
+    - biases: 각 출력 노드의 편향값
+    - 둘 다 -0.1에서 0.1 사이의 랜덤값으로 초기화
+part2. forward(순전파)
+
+```python
+def forward(self, inputs: Matrix) -> Matrix:
+    # 입력 저장 (backprop에서 사용)
+    self.inputs = inputs
+    
+    # 행렬 곱: inputs @ weights.transpose()
+    matmul_result = inputs @ self.weights.transpose()
+    
+    # 편향 더하기
+    self.output_before_activation = matmul_result + broadcasted_biases
+    
+    # 활성화 함수 적용
+    self.output = self.activation.forward(self.output_before_activation)
+```
+part3. backward(역전파)
+```python
+def backward(self, grad: Matrix) -> Matrix:
+    # 활성화 함수의 gradient 계산
+    grad = grad * self.activation.backward(self.output_before_activation)
+    
+    # weights와 biases의 gradient 계산
+    self.weight_gradients = grad.transpose() @ self.inputs
+    self.bias_gradients = grad.sum(axis=0)
+    
+    # 이전 층으로의 gradient 계산
+    return grad @ self.weights
+```
+
+
+step1. 체인룰에 따라 gradient 계산
+
+
+step2. weights, biases 업데이트를 위한 gradient 저장
+
+
+step3. 이전 층으로 gradient 전달
+
+
+part4. update
+```python
+def update(self, learning_rate: float):
+    # Gradient descent
+    self.weights = self.weights - self.weight_gradients * learning_rate
+    self.biases = self.biases - self.bias_gradients * learning_rate
+```
+
+계산된 gradient를 사용해 weights와 biases 업데이트
+learning_rate로 업데이트 크기 조절
+
+
+
+
+---
+Q. what is loss functions?
+
+
+measure neural network's performance
+
+1. Loss Functions:
+    - MSE: Mean Squared Error
+    - Cross Entropy: For multi-class classification
+    - Binary Cross Entropy: For binary classification
+
+
+ex.
+```py
+network = NeuralNetwork(
+    layers=[
+        Dense(input_size=2, output_size=4, activation=ReLU()),  # Increase hidden layer size        
+        BatchNormalization(input_size=4),                                 
+        Dense(input_size=4, output_size=3, activation=ReLU()),           
+        Dropout(dropout_rate=0.2),                                       
+        Dense(input_size=3, output_size=1, activation=Sigmoid())         
+    ],
+    loss=MSELoss()
+)
+```
+
+
+
+
+---
+전체적인 학습 프로세스 
+
+
+```
+# 각 epoch마다:
+for epoch in range(epochs):
+    # Forward pass:
+    predictions = network.forward(x_train)
+    loss = loss_function(predictions, y_train)
+    
+    # Backward pass:
+    gradients = loss_function.backward()
+    for layer in reversed(layers):
+        gradients = layer.backward(gradients)
+        
+    # Update weights:
+    for layer in layers:
+        layer.update(learning_rate)
+```
+
+
+1. bias가 있는 상태에서 일단 prediction 시도해봐 (forward pass)
+    - inputs @ weights + biases
+    - activation function(ex. ReLu 적용)
+    - 결과를 다음 레이어로 전달
+2. 결과치랑 비교하면서 결과 - 예측값을 gradient_descent로 계산해
+    - 예측치: predictions
+    - 실제값 - 예측치 = loss_function(predictions, y_train)
+    - gradient 값 계산 (loss_function.backward())
+3. weight + bias를 결과값과 예측값의 차이 만큼 수정해 
+
+
+
+---
+최적화 방법 
+
+
+1. Learning rate 조정: 0.01은 적당한 시작점
+2. Epochs 증가: 3000번 반복
+3. Batch size: 4 (전체 데이터 사용)
+
+
+네트워크 구조:
+- BatchNormalization: 학습 안정화
+- Dropout: 과적합 방지
+- 여러 은닉층: 복잡한 패턴 학습
+
+
+---
+Q. what is batch normalization?
+
+
+Q. why batch normalize?
+
+A. 학습 안정화를 위해.
+
+어케?
+
+ex.
+예를 들어 이런 값들이 레이어에 입력된다고 가정
+inputs = [100, 200, 300, 400]
+
+BatchNormalization은:
+# 1. 평균을 0으로
+normalized = [value - mean(inputs) for value in inputs]
+결과: [-150, -50, 50, 150]
+
+2. 표준편차를 1로
+normalized = normalized / std(normalized)
+결과: [-1.34, -0.45, 0.45, 1.34]
+
+이렇게 하면 *모든 값이 비슷한 범위*에 있게 됨
+
+pros
+1. Gradient vanishing/exploding 문제 감소
+2. 학습 속도 향상
+
+
+
+
+
+---
+takeaway for learning in real life 
+
+
+1. 예측과 backpropagation, feedback to update
+    - 학습은 goal이 있고, 그걸 내 스스로 예측해서 goal과 얼마나 차이나는지 수정하는 것.
+    - 따라서 goal이 없거나, 예측이 없거나, 수정(feedback)이 없으면 학습이 아님. 
+    - feedback speed(수정)은 빠를 수록 좋다. 
+2. bias & 가중치 관련 
+    - 학습 전, 이미 있던 layer에 weight & bias가 랜덤하게 부여되는데, 같은 성공하는 학습법이라도, 원래 weight/bias가 많이 off하면 실패할 수 있다.
+    - 너무 강한 선입견은 새로운거 학습에 방해될 수 있음. 
+3. epoch(반복 itertion 노력 관련)
+    1. epoch(iteration 횟수, a.k.a 반복하는 노력)이 절대량이 적으면 결과가 안좋음. *아무리 learning_rate가 높다고 하더라도*
+        - epoch 100에 learn_rate: 100% 이면 결과가 형편없음
+        - 최소 2600은 되야 함. 거기에 learn_rate: 100%
+        - 보통은 7천인 듯.(learn_rate 5%)
+    2. epoch양이 7천대면 정확한 결과치 뽑는데, 같은 learning_rate에 그 이상 8천, 9천 늘리면 오히려 정확도가 낮아짐. 왜?
+        - local minimal에 갖히기 때문인 듯?
+4. learning rate 관련 
+    1. 동일한 epoch인데, learning_rate가 낮으면, 결과가 안좋음. 왜냐면 local minimum에 갖히거든. 
+    2. learning_rate가 너무 높아도 결과가 '부정확함'. 한번에 걸음이 성큼성큼이라 그런 듯?
+    3. learn_rate를 높이면 epoch를 큰 폭으로 줄일 수 있다.
+        - learn_rate가 100%면 필요 epoch는 2600.  
+        - learn_rate가 10%면 필요 epoch는 5000. (무려 반복노력을 2배가까이 줄일 수 있다)
+5. layer 관련
+    1. layer의 갯수는 사람의 뇌로 비유하면 뉴런의 갯수가 많고 연결도가 많은거 아님?
+    2. 뉴런의 갯수가 많은 사람이 복잡한 컨셉 학습에 유리하지 않을까?
+6. batch normalization 관련
+    1. 다른 분야도 공통된 format으로 정리하면 학습하기 유리하다. 
+    2. 배우는 내용을 normalize하면 학습에 더 효율적이라는건데, 실생활에서 calculus, statistics, geometry 등 뭘 배워도 모두 code라는 통일된 형식으로 normalize 하면 더 학습 효율이 올라가지 않을까? 일관된 format이니까.
+7. dropout 관련 
+    - overfitting을 방지하기 위해, 이전 layer(dense.py)와 과하게 엮이는걸 방지하는 애라는데, 
+    - 같은 방식의 반복 말고, '다양한 방식의 반복'이 중요하다. 
+
+
+Q. 요약하면?
+
+고수 카피해서 가중치 & bias를 내것으로 만든 후, (top down, 이 때, fast feedback speed matters)
+박치기 공룡으로 시행착오 해가며 내재화 & 내 문제에 최적화 (bottom up)
+
+충분한 iteration과 학습률(집중도, 학습방법론 등)이 필요
+

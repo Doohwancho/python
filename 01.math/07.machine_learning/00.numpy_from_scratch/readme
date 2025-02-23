@@ -1,0 +1,40 @@
+
+1. Basic Arithmetic and Data Structures
+
+Vector class implementation (1D arrays)
+Matrix class implementation (2D arrays)
+Basic operations: addition, subtraction, multiplication, division
+Element-wise operations
+Broadcasting functionality
+
+
+2. Linear Algebra Fundamentals
+
+Matrix multiplication
+Matrix transposition
+Dot product
+Vector normalization
+Matrix determinant
+Matrix inverse
+Matrix rank
+Eigenvalues and eigenvectors (essential for PCA later)
+
+
+3. Calculus Operations
+
+Basic differentiation
+Partial derivatives
+Chain rule implementation
+Gradient computation
+Basic integration methods
+Automatic differentiation (for backpropagation)
+
+
+4. Statistical Functions
+
+Mean, median, mode
+Variance and standard deviation
+Covariance and correlation
+Probability distributions (Normal, Uniform)
+Random number generation
+Sampling methods

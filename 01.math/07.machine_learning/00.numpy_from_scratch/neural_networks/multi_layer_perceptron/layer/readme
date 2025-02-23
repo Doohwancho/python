@@ -1,0 +1,8 @@
+---
+4 different layers serves different purpose
+
+
+1. Dense (Fully Connected) - Basic neural network layer
+2. BatchNormalization - Normalizes layer inputs, helps training
+3. Dropout - Prevents overfitting
+4. Activation Layers (ReLU, Sigmoid) - Non-linear transformations

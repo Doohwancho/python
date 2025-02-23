@@ -1,0 +1,36 @@
+---
+Differentiation Methods
+
+1. Numerical Differentiation (in Optimizer class)
+    - Uses finite differences to approximate derivatives
+    - Simple but less accurate
+2. Automatic Differentiation (AutoDiff class)
+    - Computes exact derivatives using chain rule
+    - More accurate and efficient
+
+
+---
+optimization algorithms 
+
+
+1. Gradient Descent
+    - First-order optimization method
+    - Uses gradient to update parameters
+2. Newton's Method
+    - Second-order optimization method
+    - Uses both gradient and Hessian
+3. Conjugate Gradient
+    - Specialized for solving linear systems
+    - More efficient than standard gradient descent for certain problems
+4. GMRES
+    - For solving non-symmetric linear systems
+    - Uses Krylov subspaces and Arnoldi iteration
+
+
+---
+Each of these components builds on the others:
+
+
+- Optimizers use differentiation methods
+- Newton's Method uses both gradients and Hessians
+- GMRES uses orthogonalization and matrix operations

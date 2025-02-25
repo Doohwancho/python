@@ -9,9 +9,9 @@ sys.path.append(project_root)
 from neural_networks.multi_layer_perceptron.multi_layer_perceptron import NeuralNetwork
 from neural_networks.multi_layer_perceptron.layer.dense import Dense
 from neural_networks.multi_layer_perceptron.layer.batch_normalization import BatchNormalization
-from neural_networks.multi_layer_perceptron.layer.dropout import Dropout  
+from neural_networks.multi_layer_perceptron.layer.dropout import Dropout
 from neural_networks.multi_layer_perceptron.activation_function.ReLu import ReLU
-from neural_networks.multi_layer_perceptron.activation_function.sigmoid import Sigmoid  
+from neural_networks.multi_layer_perceptron.activation_function.sigmoid import Sigmoid
 from neural_networks.multi_layer_perceptron.loss.MSE_loss import MSELoss
 from linear_algebra.matrix import Matrix
 
@@ -54,12 +54,12 @@ Learning rate: 1.00, Minimum epochs needed: 10000
 def test_xor():
     """Test XOR problem with a simple neural network"""
     # Q. 얼만큼 train할거야? 얼만큼 learn_rate로 할거야?
-    # case1) 기본 gradient descent 인 경우, 
-    # 성공 케이스 epoch 7000, learn_rate 0.05 
+    # case1) 기본 gradient descent 인 경우,
+    # 성공 케이스 epoch 7000, learn_rate 0.05
     # 성공 케이스 epoch 5000, learn_rate 0.1
-    # 성공 케이스 epoch 2600, learn_rate 1.0 
+    # 성공 케이스 epoch 2600, learn_rate 1.0
 
-    # case2) custom gradient descent를 사용한 경우 
+    # case2) custom gradient descent를 사용한 경우
     # epoch = 5000
     # learning_rate = 1.0
 
@@ -70,29 +70,29 @@ def test_xor():
                 # 입력층 -> 첫 번째 은닉층
                 # input(2) -> hidden(4) (문제가 복잡할 수록 여러 레이어와 노드가 필요하겠지? ex. XOR문제는 선형적으로 분리 불가능한 문제)
                 # 입력은 4x2 matrix (x_train)
-                # 출력은 4x4 matrix 
+                # 출력은 4x4 matrix
                 # Q. 왜 input size가 2임?
-                # A. x_train에 column이 2니까, 2개씩 입력되기 때문 
-                Dense(input_size=2, output_size=4, activation=ReLU(), learning_rate=learning_rate),  
-                BatchNormalization(input_size=4), # 학습 안정화. Q. 어떻게 학습 안정화 함? A. Batch normalization 파일에 적어둠                 
+                # A. x_train에 column이 2니까, 2개씩 입력되기 때문
+                Dense(input_size=2, output_size=4, activation=ReLU(), learning_rate=learning_rate),
+                BatchNormalization(input_size=4), # 학습 안정화. Q. 어떻게 학습 안정화 함? A. Batch normalization 파일에 적어둠
 
                 # 두 번째 은닉층
-                # hidden(4) -> hidden(3) 
-                Dense(input_size=4, output_size=3, activation=ReLU(), learning_rate=learning_rate),           
-                Dropout(dropout_rate=0.2), # 과적합 방지. Q. 어떻게 과적합 방지함?  A. dropout 파일에 적어둠  
+                # hidden(4) -> hidden(3)
+                Dense(input_size=4, output_size=3, activation=ReLU(), learning_rate=learning_rate),
+                Dropout(dropout_rate=0.2), # 과적합 방지. Q. 어떻게 과적합 방지함?  A. dropout 파일에 적어둠
 
                 # 출력층
                 # hidden(3) -> output(1) (3->1은 최종 결정하는 단계)
-                Dense(input_size=3, output_size=1, activation=Sigmoid(), learning_rate=learning_rate)         
-                # Q. 1,2 layer에서는 ReLU() 쓰고 마지막 출력층은 Sigmoid() 쓰는 이유는? 
-                # A. ReLU()는 0 or 양수로 단순화 한거임 -> 계산이 빠르고 gradient vanishing 문제가 적음 
-                #    sigmoid()는 출력을 0~1 사이로 제한 (이진 분류에 적합). 마지막 결과값을 0~1 사이에 확률로 해석 가능 
+                Dense(input_size=3, output_size=1, activation=Sigmoid(), learning_rate=learning_rate)
+                # Q. 1,2 layer에서는 ReLU() 쓰고 마지막 출력층은 Sigmoid() 쓰는 이유는?
+                # A. ReLU()는 0 or 양수로 단순화 한거임 -> 계산이 빠르고 gradient vanishing 문제가 적음
+                #    sigmoid()는 출력을 0~1 사이로 제한 (이진 분류에 적합). 마지막 결과값을 0~1 사이에 확률로 해석 가능
             ],
             # Q. layer의 층을 지금은 3개인데 100개로 늘리면 성능이 더 좋아지려나?
             # A. ㄴㄴ. xor문제 같이 간단한 문제는 레이어 3개면 떡을 치는데, 쉬운 문제에 100layer 쓰면 오히려 성능 안좋음.
             # Q. 왜 간단한 문제에 복잡한 레이어 쓰면 안좋음?
             # A. back() 함수에서 gradient descent값을 구해서 넘길 때, 0.25 씩 10번 계속 layer 넘어가면서 곱하다 보면 = 0.25¹⁰ ≈ 0.0000095 gradient가 너무 작아져서 사실상 학습이 안됨
-            #    그렇다고 미분값이 1보다 큰 경우, 1.5 * 1.5 * 1.5 * ... # 10번 곱하기 
+            #    그렇다고 미분값이 1보다 큰 경우, 1.5 * 1.5 * 1.5 * ... # 10번 곱하기
             #      = 1.5¹⁰ ≈ 57.665
             #    gradient가 너무 커져서 학습이 불안정해짐
             loss=MSELoss()
@@ -157,7 +157,7 @@ def test_xor():
             x_train=x_train,
             y_train=y_train,
             target_loss=0.1,
-            epochs=10000,  # Max epochs as safety
+            epochs=4000,  # Max epochs as safety
             batch_size=4,
             learning_rate=lr
         )
@@ -171,14 +171,14 @@ def test_xor():
 
 
     # Train
-    # 성공 케이스 epoch 7000, learn_rate 0.05 
+    # 성공 케이스 epoch 7000, learn_rate 0.05
     # losses = network.train(
     #     x_train=x_train,  # input이 이럴 때, (goal)
     #     y_train=y_train,  # output이 이렇게 나와야 한다. (goal)
     #     epochs=7000,      # if you want to optimize, change epochs(iterations)
     #     batch_size=4,     # Use all data in each batch
     #     learning_rate=0.05 # if you want to optimize, change learning rate
-    # ) 
+    # )
 
     # 성공 케이스. (epoch 5000, learn_rate 0.1)
     # losses = network.train(
@@ -187,7 +187,7 @@ def test_xor():
     #     epochs=epoch,      # if you want to optimize, change epochs(iterations)
     #     batch_size=4,     # Use all data in each batch
     #     learning_rate=learning_rate # if you want to optimize, change learning rate
-    # ) 
+    # )
 
     # 성공 케이스. (epoch 2600, learn_rate 1.0)
     # losses = network.train(
@@ -196,7 +196,7 @@ def test_xor():
     #     epochs=2600,      # if you want to optimize, change epochs(iterations)
     #     batch_size=4,     # Use all data in each batch
     #     learning_rate=1 # if you want to optimize, change learning rate
-    # ) 
+    # )
 
     # 초기 실패 케이스
     # losses = network.train(
@@ -205,9 +205,9 @@ def test_xor():
     #     epochs=1000,      # if you want to optimize, change epochs(iterations)
     #     batch_size=4,     # Use all data in each batch
     #     learning_rate=0.01 # if you want to optimize, change learning rate
-    # ) 
+    # )
 
-    
+
     # # Test predictions
     # predictions = network.predict(x_train)
     # print("Predictions:", predictions)

@@ -1,8 +1,0 @@
-1. MLP(multi layer perceptrons)
-    - fundamental 
-2. CNN
-    - 이미지 처리에 많이 썼었음 2017년도까지
-3. RNN
-    - text/audio/시계열 데이터 같은 sequential data 처리에 많이 썼음 2017년도까지 
-
-그러다가 transformer에게 대체 당하긴 했지만....

@@ -1,3 +1,6 @@
+from neural_networks.multi_layer_perceptron.loss.loss import Loss
+from linear_algebra.matrix import NDArray
+
 class CrossEntropyLoss(Loss):
     """Cross Entropy Loss for classification"""
     @staticmethod

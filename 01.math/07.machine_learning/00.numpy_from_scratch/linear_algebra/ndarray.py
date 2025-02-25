@@ -5,6 +5,15 @@ class NDArray:
     """
     N-dimensional array implementation
     """
+    def __init__(self, data):
+        """
+        numpy array를 래핑하는 클래스임 ㅋㅋ
+        """
+        if isinstance(data, NDArray):
+            self.data = data.data
+        else:
+            self.data = np.array(data)
+
     def __init__(self, data: Sequence, shape: Tuple[int, ...] = None):
         self._data = self._validate_and_copy_data(data, shape)
         self._shape = self._calculate_shape(self._data)

@@ -1,0 +1,21 @@
+1. 두 벡터 더하기
+2. 벡터의 스칼라 곱 
+3. vector norm은 그 벡터의 길이이고, ||v||라고도 표현함. 피타고라스로 구함 
+4. 두 벡터에서 수선의 발을 내려 closest 한 부분까지가 projection
+    - projection의 용도는 find closest point 찾을 때 쓰거나, 
+    - 그림자 만들 때 쓰거나 
+    - PCA에서 reduce dimension 할 때 씀. 차원 축소시 중요한 정보를 최대한 잃지 않고 줄이는 데 쓰임
+5. 두 벡터의 내적은 두 벡터의 길이와 그 사이의 각도의 코사인 값을 곱한 것이다.
+    - 두 벡터의 dot product 구하면 scalar 값이 나온다. (두 벡터의 유사도를 알려줌)
+    - dot product는 두 벡터의 값을 곱한걸 다 더하는 것으로, 숫자가 양수에 클 수록 두 벡터가 가깝고 유사하다는 것. 마이너스고 멀 수록 유사하지 않다는 것
+6. 두 벡터의 외적은 두 벡터의 길이와 그 사이의 각도의 사인 값을 곱한 것이다.
+    - 두 벡터 사이에 평행사변형의 면적이 두 벡터의 외적값임
+    - 두 벡터의 외적을 구하면 스칼라가 아니라 벡터가 나오는데,
+    - 두 벡터의 외적으로 나온 벡터의 가장 큰 특징은 원래 두 벡터 a,b 둘 다에게 수직(perpendicular)하다는 것
+    - 이 결과 벡터는 기존 벡터 a,b에 대해서 linearly independent하다. 즉 선형 독립 관계가 되는 거임. a와 b를 아무리 지지고 볶아도 a × b를 절대 만들 수 없으니까.
+    - 외적은 기존 두 벡터가 만들던 차원(평면)에 선형 독립인 새로운 축(차원)을 하나 더 만들어주는 역할을 하는 거다.
+7. linearly dependent vs linearly independent
+    - approximation이나 regression, 나중에 PCA 차원축소할 때 중요한 개념
+    - a,b vector 있고, c = 2a + 3b 이렇게 표현되면 linearly dependent. c가 a,b를 지지고 볶아서 만들 수 있으면, 다른 축이 아닌 것. 
+    - 그래서 차원 축소할 때, 불필요한 축을 제거해야 하는데, 그러려면 linearly dependent한 축을 찾아서 제거해야 함. 
+    - 그리고 regression할 때에도 linearly dependent한 축을 찾아서 제거해야 함. 

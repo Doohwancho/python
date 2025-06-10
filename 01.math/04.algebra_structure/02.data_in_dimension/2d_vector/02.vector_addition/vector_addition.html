@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Vector Addition</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f0f0f0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        padding: 20px;
+        margin: 0;
+      }
+      h1 {
+        color: #333;
+      }
+      #canvas-container {
+        border: 2px solid #333;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      #controls {
+        display: flex;
+        gap: 40px;
+        margin-top: 20px;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      .vector-control {
+        border-right: 1px solid #ddd;
+        padding-right: 40px;
+      }
+      .vector-control:last-child {
+        border-right: none;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input[type="number"] {
+        width: 80px;
+        padding: 5px;
+        margin-bottom: 10px;
+      }
+      .vectorA-label {
+        color: #d9534f;
+      }
+      .vectorB-label {
+        color: #428bca;
+      }
+      .result-label {
+        color: #5cb85c;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Interactive Vector Addition</h1>
+
+    <div id="canvas-container">
+      <canvas id="vectorCanvas" width="800" height="600"></canvas>
+    </div>
+
+    <div id="controls">
+      <div class="vector-control">
+        <h3 class="vectorA-label">Vector A = [a<sub>x</sub>, a<sub>y</sub>]</h3>
+        <label for="ax">a<sub>x</sub>:</label>
+        <input type="number" id="ax" value="150" />
+        <label for="ay">a<sub>y</sub>:</label>
+        <input type="number" id="ay" value="100" />
+      </div>
+
+      <div class="vector-control">
+        <h3 class="vectorB-label">Vector B = [b<sub>x</sub>, b<sub>y</sub>]</h3>
+        <label for="bx">b<sub>x</sub>:</label>
+        <input type="number" id="bx" value="50" />
+        <label for="by">b<sub>y</sub>:</label>
+        <input type="number" id="by" value="200" />
+      </div>
+
+      <div>
+        <h3 class="result-label">Resultant C = A + B</h3>
+        <p>
+          <strong>C</strong> = [<span id="cx"></span>, <span id="cy"></span>]
+        </p>
+        <p><strong>Magnitude |C|</strong>: <span id="magnitude"></span></p>
+      </div>
+    </div>
+
+    <script>
+      // --- Get DOM Elements ---
+      const canvas = document.getElementById("vectorCanvas");
+      const ctx = canvas.getContext("2d");
+
+      const inputAx = document.getElementById("ax");
+      const inputAy = document.getElementById("ay");
+      const inputBx = document.getElementById("bx");
+      const inputBy = document.getElementById("by");
+
+      const outputCx = document.getElementById("cx");
+      const outputCy = document.getElementById("cy");
+      const outputMag = document.getElementById("magnitude");
+
+      // --- Canvas Setup ---
+      const origin = { x: canvas.width / 2, y: canvas.height / 2 };
+      const gridSize = 50;
+
+      // --- Helper Function to Draw Grid ---
+      function drawGrid() {
+        ctx.beginPath();
+        ctx.strokeStyle = "#e0e0e0";
+        ctx.lineWidth = 1;
+
+        // Vertical lines
+        for (let x = origin.x % gridSize; x < canvas.width; x += gridSize) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+        }
+        // Horizontal lines
+        for (let y = origin.y % gridSize; y < canvas.height; y += gridSize) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+
+        // Draw thicker axes
+        ctx.beginPath();
+        ctx.strokeStyle = "#cccccc";
+        ctx.moveTo(origin.x, 0);
+        ctx.lineTo(origin.x, canvas.height);
+        ctx.moveTo(0, origin.y);
+        ctx.lineTo(canvas.width, origin.y);
+        ctx.stroke();
+      }
+
+      // --- Helper Function to Draw a Vector ---
+      // (ox, oy) is the starting point of the vector on the canvas
+      // (vx, vy) are the vector components
+      function drawVector(ox, oy, vx, vy, color, label = "") {
+        const endX = ox + vx;
+        // Canvas Y-axis is inverted, so we subtract vy
+        const endY = oy - vy;
+
+        // Draw vector line
+        ctx.beginPath();
+        ctx.moveTo(ox, oy);
+        ctx.lineTo(endX, endY);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Draw arrowhead
+        const angle = Math.atan2(-vy, vx);
+        const arrowSize = 10;
+        ctx.beginPath();
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(
+          endX - arrowSize * Math.cos(angle - Math.PI / 6),
+          endY - arrowSize * Math.sin(angle - Math.PI / 6)
+        );
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(
+          endX - arrowSize * Math.cos(angle + Math.PI / 6),
+          endY - arrowSize * Math.sin(angle + Math.PI / 6)
+        );
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Draw label
+        if (label) {
+          ctx.fillStyle = color;
+          ctx.font = "bold 16px Arial";
+          ctx.fillText(label, endX + 10, endY);
+        }
+      }
+
+      // --- Main Drawing Function ---
+      function drawScene() {
+        // Clear the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw the background grid
+        drawGrid();
+
+        // Get vector values from input fields
+        const ax = parseFloat(inputAx.value);
+        const ay = parseFloat(inputAy.value);
+        const bx = parseFloat(inputBx.value);
+        const by = parseFloat(inputBy.value);
+
+        // Calculate resultant vector C
+        const cx = ax + bx;
+        const cy = ay + by;
+
+        // --- Draw the vectors ---
+
+        // 1. Draw Vector A (from origin)
+        drawVector(origin.x, origin.y, ax, ay, "#d9534f", "A");
+
+        // 2. Draw Vector B (from the tip of A) - "Head-to-Tail"
+        const tipOfA_x = origin.x + ax;
+        const tipOfA_y = origin.y - ay;
+        drawVector(tipOfA_x, tipOfA_y, bx, by, "#428bca", "B");
+
+        // 2a. (Optional) Draw a faint Vector B from the origin for reference
+        ctx.globalAlpha = 0.3;
+        ctx.setLineDash([5, 5]); // Dashed line
+        drawVector(origin.x, origin.y, bx, by, "#428bca");
+        ctx.globalAlpha = 1.0;
+        ctx.setLineDash([]); // Solid line
+
+        // 3. Draw Resultant Vector C (from origin)
+        drawVector(origin.x, origin.y, cx, cy, "#5cb85c", "C = A + B");
+
+        // --- Update Information Display ---
+        outputCx.textContent = cx.toFixed(2);
+        outputCy.textContent = cy.toFixed(2);
+        const magnitude = Math.sqrt(cx ** 2 + cy ** 2);
+        outputMag.textContent = magnitude.toFixed(2);
+      }
+
+      // --- Event Listeners ---
+      // Redraw the scene whenever any input value changes
+      [inputAx, inputAy, inputBx, inputBy].forEach((input) => {
+        input.addEventListener("input", drawScene);
+      });
+
+      // Initial draw when the page loads
+      window.addEventListener("load", drawScene);
+    </script>
+  </body>
+</html>

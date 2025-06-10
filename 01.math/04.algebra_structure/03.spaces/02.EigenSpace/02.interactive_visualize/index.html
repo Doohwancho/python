@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Interactive Eigenvector Animation</title>
+    <style>
+      body {
+        margin: 0;
+        background: #111;
+        color: #eee;
+        font-family: "Courier New", Courier, monospace;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+      }
+      .panel {
+        position: fixed;
+        background: rgba(0, 0, 0, 0.75);
+        padding: 15px;
+        border-radius: 8px;
+        font-size: 16px;
+        line-height: 1.6;
+      }
+      #info-panel {
+        top: 20px;
+        left: 20px;
+        width: 340px;
+      }
+      #output-panel {
+        top: 20px;
+        right: 20px;
+        width: 450px;
+        padding: 10px 15px;
+      }
+      #controls {
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      button {
+        background: #444;
+        color: white;
+        border: 1px solid #666;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 0 5px;
+      }
+      button:hover {
+        background: #555;
+      }
+      .equation {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        font-size: 20px;
+      }
+      .matrix {
+        display: flex;
+        align-items: center;
+      }
+      .matrix table {
+        border-spacing: 0;
+      }
+      .matrix td {
+        padding: 0 5px;
+        text-align: center;
+      }
+      .matrix-paren {
+        font-size: 2.5em;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <div id="info-panel" class="panel"></div>
+    <div id="output-panel" class="panel"></div>
+    <div id="controls" class="panel">
+      <button id="reset-btn">Reset</button>
+      <button id="toggle-grid-btn">Toggle Grid</button>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const infoPanel = document.getElementById("info-panel");
+      const outputPanel = document.getElementById("output-panel");
+
+      // --- 1. 변환 행렬과 고유값/고유벡터 정의 ---
+      const matrixA = { a: 3, b: 1, c: 0, d: 2 };
+      const eigenvectors = [
+        { vec: { x: 1, y: 0 }, value: 3, color: "#ff44ff" }, // λ=3, e1
+        { vec: { x: -1, y: 1 }, value: 2, color: "#ffaa44" }, // λ=2, e2
+      ];
+      const identityMatrix = { a: 1, b: 0, c: 0, d: 1 };
+
+      let inputVector = null;
+      let isAnimating = false;
+      let showGrid = true;
+      let animationFrameId;
+
+      function setupUI() {
+        infoPanel.innerHTML = `
+                <div><strong>Transformation Matrix A:</strong></div>
+                <div class="equation">
+                    <div class="matrix">
+                        <span class="matrix-paren">[</span>
+                        <table>
+                            <tr><td>${matrixA.a}</td><td>${matrixA.b}</td></tr>
+                            <tr><td>${matrixA.c}</td><td>${matrixA.d}</td></tr>
+                        </table>
+                        <span class="matrix-paren">]</span>
+                    </div>
+                </div>
+                <hr>
+                <div><strong>Eigenvectors of A:</strong></div>
+                <div style="color:${eigenvectors[0].color};">• e₁ (direction), λ₁ = ${eigenvectors[0].value} (scale)</div>
+                <div style="color:${eigenvectors[1].color};">• e₂ (direction), λ₂ = ${eigenvectors[1].value} (scale)</div>
+                <hr>
+                <div>Click anywhere to start the animation.</div>
+            `;
+        outputPanel.innerHTML =
+          '<div class="equation" style="color:#555;">A × x = b</div>';
+      }
+
+      // --- 2. 헬퍼 함수 및 그리기 함수 ---
+      const toScreen = (v) => {
+        const scale = Math.min(canvas.width, canvas.height) / 10;
+        return {
+          x: canvas.width / 2 + v.x * scale,
+          y: canvas.height / 2 - v.y * scale,
+        };
+      };
+      const fromScreen = (p) => {
+        const scale = Math.min(canvas.width, canvas.height) / 10;
+        return {
+          x: (p.x - canvas.width / 2) / scale,
+          y: -(p.y - canvas.height / 2) / scale,
+        };
+      };
+
+      function lerp(start, end, t) {
+        return start + (end - start) * t;
+      }
+
+      function drawGrid(matrix) {
+        if (!showGrid) return;
+        ctx.strokeStyle = "#333";
+        ctx.lineWidth = 1;
+        const step = 1;
+        const gridSize = 10;
+        for (let i = -gridSize; i <= gridSize; i += step) {
+          // Vertical lines
+          let start = {
+            x: matrix.a * i + matrix.b * -gridSize,
+            y: matrix.c * i + matrix.d * -gridSize,
+          };
+          let end = {
+            x: matrix.a * i + matrix.b * gridSize,
+            y: matrix.c * i + matrix.d * gridSize,
+          };
+          const screenStart = toScreen(start);
+          const screenEnd = toScreen(end);
+          ctx.beginPath();
+          ctx.moveTo(screenStart.x, screenStart.y);
+          ctx.lineTo(screenEnd.x, screenEnd.y);
+          ctx.stroke();
+
+          // Horizontal lines
+          start = {
+            x: matrix.a * -gridSize + matrix.b * i,
+            y: matrix.c * -gridSize + matrix.d * i,
+          };
+          end = {
+            x: matrix.a * gridSize + matrix.b * i,
+            y: matrix.c * gridSize + matrix.d * i,
+          };
+          const screenStartH = toScreen(start);
+          const screenEndH = toScreen(end);
+          ctx.beginPath();
+          ctx.moveTo(screenStartH.x, screenStartH.y);
+          ctx.lineTo(screenEndH.x, screenEndH.y);
+          ctx.stroke();
+        }
+      }
+
+      function drawVector(v, color, width = 2) {
+        if (!v) return;
+        const start = toScreen({ x: 0, y: 0 });
+        const end = toScreen(v);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+        // Arrowhead
+        const angle = Math.atan2(end.y - start.y, end.x - start.x);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(end.x, end.y);
+        ctx.lineTo(
+          end.x - 15 * Math.cos(angle - Math.PI / 6),
+          end.y - 15 * Math.sin(angle - Math.PI / 6)
+        );
+        ctx.lineTo(
+          end.x - 15 * Math.cos(angle + Math.PI / 6),
+          end.y - 15 * Math.sin(angle + Math.PI / 6)
+        );
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      function drawScene(t = 0) {
+        ctx.fillStyle = "#111";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const m = {
+          a: lerp(identityMatrix.a, matrixA.a, t),
+          b: lerp(identityMatrix.b, matrixA.b, t),
+          c: lerp(identityMatrix.c, matrixA.c, t),
+          d: lerp(identityMatrix.d, matrixA.d, t),
+        };
+        drawGrid(m);
+
+        eigenvectors.forEach((ev) => {
+          ctx.strokeStyle = ev.color;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([10, 10]);
+          ctx.beginPath();
+          const start = toScreen({ x: ev.vec.x * -10, y: ev.vec.y * -10 });
+          const end = toScreen({ x: ev.vec.x * 10, y: ev.vec.y * 10 });
+          ctx.moveTo(start.x, start.y);
+          ctx.lineTo(end.x, end.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        });
+
+        if (inputVector) {
+          const transformedVector = {
+            x: m.a * inputVector.x + m.b * inputVector.y,
+            y: m.c * inputVector.x + m.d * inputVector.y,
+          };
+          drawVector(inputVector, "#aaa", 2);
+          drawVector(transformedVector, "#ffff00", 3);
+        }
+      }
+
+      function updateOutputPanel(x, b) {
+        const vectorToHTML = (v, color) => `
+                <div class="matrix">
+                    <span class="matrix-paren" style="color:${color};">[</span>
+                    <table style="color:${color};"><tr><td>${v.x.toFixed(
+          2
+        )}</td></tr><tr><td>${v.y.toFixed(2)}</td></tr></table>
+                    <span class="matrix-paren" style="color:${color};">]</span>
+                </div>`;
+
+        outputPanel.innerHTML = `
+                <div class="equation">
+                    <div class="matrix">
+                        <span class="matrix-paren">[</span>
+                        <table><tr><td>${matrixA.a}</td><td>${
+          matrixA.b
+        }</td></tr><tr><td>${matrixA.c}</td><td>${matrixA.d}</td></tr></table>
+                        <span class="matrix-paren">]</span>
+                    </div>
+                    <span>×</span>
+                    ${vectorToHTML(x, "#aaa")}
+                    <span>=</span>
+                    ${vectorToHTML(b, "#ffff00")}
+                </div>`;
+      }
+
+      function animateTransformation(x) {
+        if (isAnimating) return;
+        isAnimating = true;
+        let startTime = null;
+        const duration = 1000;
+
+        function animationLoop(timestamp) {
+          if (!startTime) startTime = timestamp;
+          const elapsedTime = timestamp - startTime;
+          let t = Math.min(elapsedTime / duration, 1);
+          t = 1 - Math.pow(1 - t, 3);
+          drawScene(t);
+          if (elapsedTime < duration) {
+            animationFrameId = requestAnimationFrame(animationLoop);
+          } else {
+            isAnimating = false;
+            const final_b = {
+              x: matrixA.a * x.x + matrixA.b * x.y,
+              y: matrixA.c * x.x + matrixA.d * x.y,
+            };
+            updateOutputPanel(x, final_b);
+          }
+        }
+        animationFrameId = requestAnimationFrame(animationLoop);
+      }
+
+      function handleCanvasClick(event) {
+        if (isAnimating) return;
+        const rect = canvas.getBoundingClientRect();
+        inputVector = fromScreen({
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        });
+        outputPanel.innerHTML =
+          '<div class="equation" style="color:#555;">Animating...</div>';
+        animateTransformation(inputVector);
+      }
+
+      function reset() {
+        cancelAnimationFrame(animationFrameId);
+        isAnimating = false;
+        inputVector = null;
+        drawScene(0);
+        outputPanel.innerHTML =
+          '<div class="equation" style="color:#555;">A × x = b</div>';
+      }
+
+      // --- 4. 이벤트 리스너 설정 ---
+      canvas.addEventListener("click", handleCanvasClick);
+      document.getElementById("reset-btn").addEventListener("click", reset);
+
+      // FIX: This event listener now correctly finds its button
+      document
+        .getElementById("toggle-grid-btn")
+        .addEventListener("click", () => {
+          showGrid = !showGrid;
+          if (!isAnimating) {
+            drawScene(0);
+          }
+        });
+
+      window.addEventListener("resize", () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        if (!isAnimating) drawScene(0);
+      });
+
+      // --- 초기화 ---
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      setupUI();
+      drawScene(0);
+    </script>
+  </body>
+</html>

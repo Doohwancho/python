@@ -1,0 +1,35 @@
+1. Ax = b (vector view && surface view)
+    - "왜 굳이 행렬로 방정식을 표현할까? (변수가 수십, 수백 개가 되어도 같은 형태로 표현하고 풀 수 있는 일반성과 강력함 때문)"
+2. 같은 2x2 matrix를 vector view로 보기 && linear transformation(x,y축이 이동)으로 보기 && eigenspace view로 보기 && 3d에서 matrix as surface로 보기 
+3. types of matrix 
+    1. identity matrix
+    2. 영행렬
+    3. 대각행렬 
+    4. symmetric matrix (대칭행렬)
+    5. transpose matrix (행과 열을 뒤집은 행렬)
+    6. orthogonal matrix
+3. matrix key properties  (Q. types of matrix랑 matrix properties랑 뭐가 다른거야? 많이 겹치는데?)
+    - identity matrix,
+    - rank,
+    - determinant, 
+    - inverse matrix, 
+    - transpose matrix, 
+    - symmetric matrix, 
+    - orthogonal matrix
+4. matrix multiplication 
+    1. 행렬 * 스칼라 곱 
+    2. 행렬 * 벡터 곱 
+        - Ax = b (행렬 * vector 곱)
+    3. 행렬 * 행렬 곱
+5. linear transformation 
+    - Matrix를 곱한다는건, 벡터 공간에서 벡터 공간으로 매핑하는 함수
+    - 선형 변환은 벡터 공간의 기저 벡터를 변환하여 새로운 벡터 공간을 형성
+    - 벡터에 행렬(선형 변환, linear transformation)을 곱한다는건, 회전, 확대, 축소, 기울어짐 등 변환을 겪는다. 
+    - "2x2 행렬의 각 열(column)은 기본 벡터 [ 1 0 ] 와 [ 0 1 ] 가 어디로 변환되는지를 나타내는 것과 같다. 이게 무슨 의미일까?"
+6. space에 대한 이해 
+    - linearly independent 
+    - 행렬의 랭크 (Rank): 행렬의 열(또는 행)들이 생성하는 공간의 차원. 즉, 선형 변환 후 결과물이 몇 차원 공간에 존재하는지 알려줌. (선형 독립인 열의 개수)
+    - 4대 기본 부분 공간: 열 공간(Column Space), 영 공간(Null Space), 행 공간(Row Space), 좌측 영 공간(Left Null Space).
+    - Q. "행렬의 랭크가 왜 중요한가? (연립 방정식의 해가 존재하는지, 유일한지 등을 판별하는 기준)"
+    - Q. "영 공간(Null Space)이란 무엇인가? (Ax=0 을 만족하는 벡터 x들의 집합, 즉 변환에 의해 '소멸'되어 원점으로 가는 벡터들)"
+
